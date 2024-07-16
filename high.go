@@ -120,6 +120,9 @@ type AuthData struct {
 	CookieData []byte
 }
 
+// Authenticate the connection using the given AuthMethod and (if required) AuthData
+//
+// This function is fully thread-safe, although there shouldn't be any scenario, where that's applicable
 func (c *Controller) Authenticate(method AuthMethod, data AuthData) error {
 	err := c.iAuthenticate(method, data)
 	if err != nil {
@@ -271,6 +274,9 @@ func (c *Controller) updateEvents() error {
 	return c.LowController.SetEvents(slices.Compact(keys))
 }
 
+// RegisterEvent sets the callback function for the given event.
+//
+// This function is fully thread-safe.
 func (c *Controller) RegisterEvent(code EventCode, callback func([]ReplyLine)) error {
 	c.notifLock.Lock()
 	c.notifHandler[string(code)] = callback
@@ -294,6 +300,9 @@ func (c *Controller) iRegisterEvent(code EventCode, callback func([]ReplyLine)) 
 	return id, c.updateEvents()
 }
 
+// UnregisterEvent removes the set callback function for the given event.
+//
+// This function is fully thread-safe.
 func (c *Controller) UnregisterEvent(code EventCode) error {
 	c.notifLock.Lock()
 	delete(c.notifHandler, string(code))
@@ -312,7 +321,11 @@ func (c *Controller) iUnregisterEvent(code EventCode, id int) error {
 	return c.updateEvents()
 }
 
-func (c *Controller) HSAlive(addr string) (bool, error) {
+// HSDescAvailable checks for the availability of the given hidden service on the hash-ring.
+// This usually means, that the hidden service is reachable.
+//
+// This function is fully thread-safe
+func (c *Controller) HSDescAvailable(addr string) (bool, error) {
 	done := make(chan bool)
 	id, err := c.iRegisterEvent(EVENT_HS_DESC, func(lines []ReplyLine) {
 		segs := strings.Split(string(lines[0].Line), " ")
@@ -357,6 +370,9 @@ func (c *Controller) workerNotification() {
 	}
 }
 
+// NewIdentity switches to new circuits, so that new requests don't share any circuits with old ones.
+//
+// This function is fully thread-safe, although TOR might rate-limit its usage.
 func (c *Controller) NewIdentity() error {
 	if !slices.Contains(c.availableSignals, string(SIGNAL_NEWNYM)) {
 		return errors.New("NEWNYM not available")
