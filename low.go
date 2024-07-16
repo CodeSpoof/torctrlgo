@@ -61,7 +61,7 @@ func processErrorLine(line ReplyLine) error {
 	case 555:
 		return ErrUnmanagedEntity(errors.New(string(line.Line)))
 	default:
-		if line.StatusCode != 250 {
+		if line.StatusCode != 250 && line.StatusCode != 252 {
 			return ErrUnknown(errors.New(string(line.Line)))
 		}
 	}
@@ -139,10 +139,7 @@ func (c *LowController) iSetConf(cmd Cmd, confs map[string]string) error {
 	if err != nil {
 		return err
 	}
-	if rep[0].StatusCode != 250 {
-		return processErrorLine(rep[0])
-	}
-	return nil
+	return processErrorLine(rep[0])
 }
 
 func (c *LowController) SetConf(confs map[string]string) error {
@@ -216,10 +213,7 @@ func (c *LowController) SaveConf(force bool) error {
 	if err != nil {
 		return err
 	}
-	if rep[0].StatusCode != 250 {
-		return processErrorLine(rep[0])
-	}
-	return nil
+	return processErrorLine(rep[0])
 }
 
 type Signal string
@@ -242,10 +236,7 @@ func (c *LowController) SendSignal(signal Signal) error {
 	if err != nil {
 		return err
 	}
-	if rep[0].StatusCode != 250 {
-		return processErrorLine(rep[0])
-	}
-	return nil
+	return processErrorLine(rep[0])
 }
 
 func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {

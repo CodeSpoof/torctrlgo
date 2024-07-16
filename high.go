@@ -207,10 +207,7 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) error {
 			return c.LowController.AuthenticateBytes(mac.Sum(nil))
 		}
 	}
-	if rep[0].StatusCode != 250 {
-		return errors.New("authentication failed")
-	}
-	return nil
+	return processErrorLine(rep[0])
 }
 
 type EventCode string
