@@ -175,36 +175,36 @@ func (c *LowController) GetConf(names []string) (map[string]string, error) {
 	return ret, nil
 }
 
-func (c *LowController) SetEvents(codes []string) (bool, error) {
+func (c *LowController) SetEvents(codes []string) error {
 	rep, err := c.sendPacket([]byte(string(CMD_SETEVENTS) + " " + strings.Join(codes, " ") + "\r\n"))
 	if err != nil {
-		return false, err
+		return err
 	}
-	return rep[0].StatusCode == 250, processErrorLine(rep[0])
+	return processErrorLine(rep[0])
 }
 
-func (c *LowController) AuthenticateNull() (bool, error) {
+func (c *LowController) AuthenticateNull() error {
 	rep, err := c.sendPacket([]byte(string(CMD_AUTHENTICATE) + "\r\n"))
 	if err != nil {
-		return false, err
+		return err
 	}
-	return rep[0].StatusCode == 250, processErrorLine(rep[0])
+	return processErrorLine(rep[0])
 }
 
-func (c *LowController) AuthenticateBytes(data []byte) (bool, error) {
+func (c *LowController) AuthenticateBytes(data []byte) error {
 	rep, err := c.sendPacket([]byte(string(CMD_AUTHENTICATE) + " " + hex.EncodeToString(data) + "\r\n"))
 	if err != nil {
-		return false, err
+		return err
 	}
-	return rep[0].StatusCode == 250, processErrorLine(rep[0])
+	return processErrorLine(rep[0])
 }
 
-func (c *LowController) AuthenticateString(data string) (bool, error) {
+func (c *LowController) AuthenticateString(data string) error {
 	rep, err := c.sendPacket([]byte(string(CMD_AUTHENTICATE) + " " + writeQString(data) + "\r\n"))
 	if err != nil {
-		return false, err
+		return err
 	}
-	return rep[0].StatusCode == 250, processErrorLine(rep[0])
+	return processErrorLine(rep[0])
 }
 
 func (c *LowController) SaveConf(force bool) error {

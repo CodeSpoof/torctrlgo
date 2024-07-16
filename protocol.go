@@ -59,7 +59,6 @@ func (c *LowController) sendPacket(data []byte) ([]ReplyLine, error) {
 		return nil, err
 	}
 	rep := <-ch
-	c.replyLock.Unlock()
 	return rep, nil
 }
 

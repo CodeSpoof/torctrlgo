@@ -10,6 +10,7 @@ import (
 	"os"
 	"slices"
 	"strings"
+	"sync"
 )
 
 // Defines high-level API for communication via ControlPort
@@ -23,7 +24,9 @@ type Controller struct {
 	VersionStatus     string
 	LowController     *LowController
 	notifHandler      map[string]func([]ReplyLine)
-	iNotifHandler     map[string]func([]ReplyLine) //TODO make registering multiple internal listeners possible
+	iNotifLock        sync.Mutex
+	iNotifHandler     map[string]map[int]func([]ReplyLine) //TODO make registering multiple internal listeners possible
+	iNotifCount       map[string]int
 	availableConfigs  map[string][2]string
 	availableInfos    map[string]string
 	availableEvents   []string
@@ -35,7 +38,9 @@ func NewController() *Controller {
 	return &Controller{
 		LowController:     NewLowController(),
 		notifHandler:      make(map[string]func([]ReplyLine)),
-		iNotifHandler:     make(map[string]func([]ReplyLine)),
+		iNotifLock:        sync.Mutex{},
+		iNotifHandler:     make(map[string]map[int]func([]ReplyLine)),
+		iNotifCount:       make(map[string]int),
 		availableConfigs:  make(map[string][2]string),
 		availableInfos:    make(map[string]string),
 		availableEvents:   make([]string, 0),
@@ -109,22 +114,21 @@ type AuthData struct {
 	CookieData []byte
 }
 
-func (c *Controller) Authenticate(method AuthMethod, data AuthData) (bool, error) {
-	succ, err := c.iAuthenticate(method, data)
-	if err != nil || !succ {
-		return succ, err
+func (c *Controller) Authenticate(method AuthMethod, data AuthData) error {
+	err := c.iAuthenticate(method, data)
+	if err != nil {
+		return err
 	}
-	err = c.loadCompatData()
-	return succ, err
+	return c.loadCompatData()
 }
 
-func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) (bool, error) {
+func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) error {
 	var rep []ReplyLine
 	var err error
 	if c.LowController.lastProtocolInfo == nil && (method == AUTH_COOKIE || method == AUTH_SAFECOOKIE) {
 		_, err = c.LowController.GetProtocolInfo([]string{"1"})
 		if err != nil {
-			return false, err
+			return err
 		}
 	}
 	switch method {
@@ -134,7 +138,7 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) (bool, erro
 		return c.LowController.AuthenticateString(data.Password)
 	case AUTH_COOKIE, AUTH_SAFECOOKIE:
 		if len(c.LowController.lastProtocolInfo.CookieFiles) == 0 {
-			return false, errors.New("no cookie files found")
+			return errors.New("no cookie files found")
 		}
 		b := data.CookieData
 		if b == nil {
@@ -150,18 +154,18 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) (bool, erro
 			}
 		}
 		if b == nil {
-			return false, errors.New("cookie files couldn't be accessed")
+			return errors.New("cookie files couldn't be accessed")
 		} else if method == AUTH_COOKIE {
 			return c.LowController.AuthenticateBytes(b)
 		} else {
 			clientNonce := make([]byte, 32)
 			_, err = rand.Read(clientNonce)
 			if err != nil {
-				return false, err
+				return err
 			}
 			serverHash, serverNonce, err := c.LowController.AuthChallenge("SAFECOOKIE", clientNonce)
 			if err != nil {
-				return false, err
+				return err
 			}
 			mac := hmac.New(sha256.New, []byte("Tor safe cookie authentication server-to-controller hash"))
 			mac.Write(b)
@@ -171,7 +175,7 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) (bool, erro
 			testNonce := make([]byte, 32)
 			_, err = rand.Read(testNonce)
 			if err != nil {
-				return false, err
+				return err
 			}
 			mac = hmac.New(sha256.New, testNonce)
 			mac.Write(serverHash)
@@ -179,7 +183,7 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) (bool, erro
 			mac.Reset()
 			mac.Write(expectedServerHash)
 			if !bytes.Equal(challengeHmac, mac.Sum(nil)) {
-				return false, errors.New("tor provided wrong serverNonce")
+				return errors.New("tor provided wrong serverNonce")
 			}
 			mac = hmac.New(sha256.New, []byte("Tor safe cookie authentication controller-to-server hash"))
 			mac.Write(b)
@@ -189,9 +193,9 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) (bool, erro
 		}
 	}
 	if rep[0].StatusCode != 250 {
-		return false, errors.New("authentication failed")
+		return errors.New("authentication failed")
 	}
-	return true, nil
+	return nil
 }
 
 type EventCode string
@@ -234,7 +238,7 @@ const (
 	EVENT_PT_STATUS          EventCode = "PT_STATUS"
 )
 
-func (c *Controller) updateEvents() (bool, error) {
+func (c *Controller) updateEvents() error {
 	keys := make([]string, len(c.notifHandler)+len(c.iNotifHandler))
 	i := 0
 	for k := range c.notifHandler {
@@ -249,29 +253,42 @@ func (c *Controller) updateEvents() (bool, error) {
 	return c.LowController.SetEvents(slices.Compact(keys))
 }
 
-func (c *Controller) RegisterEvent(code EventCode, callback func([]ReplyLine)) (bool, error) {
+func (c *Controller) RegisterEvent(code EventCode, callback func([]ReplyLine)) error {
 	c.notifHandler[string(code)] = callback
 	return c.updateEvents()
 }
 
-func (c *Controller) iRegisterEvent(code EventCode, callback func([]ReplyLine)) (bool, error) {
-	c.iNotifHandler[string(code)] = callback
-	return c.updateEvents()
+func (c *Controller) iRegisterEvent(code EventCode, callback func([]ReplyLine)) (int, error) {
+	c.iNotifLock.Lock()
+	var id int
+	if val, ok := c.iNotifCount[string(code)]; ok {
+		id = val + 1
+		c.iNotifCount[string(code)]++
+		c.iNotifHandler[string(code)][id] = callback
+	}
+	defer c.iNotifLock.Unlock()
+	return id, c.updateEvents()
 }
 
-func (c *Controller) UnregisterEvent(code EventCode) (bool, error) {
+func (c *Controller) UnregisterEvent(code EventCode) error {
 	delete(c.notifHandler, string(code))
 	return c.updateEvents()
 }
 
-func (c *Controller) iUnregisterEvent(code EventCode) (bool, error) {
-	delete(c.iNotifHandler, string(code))
+func (c *Controller) iUnregisterEvent(code EventCode, id int) error {
+	c.iNotifLock.Lock()
+	delete(c.iNotifHandler[string(code)], id)
+	if len(c.iNotifHandler[string(code)]) == 0 {
+		delete(c.iNotifHandler, string(code))
+		delete(c.iNotifCount, string(code))
+	}
+	defer c.iNotifLock.Unlock()
 	return c.updateEvents()
 }
 
 func (c *Controller) HSAlive(addr string) (bool, error) {
 	done := make(chan bool)
-	succ, err := c.iRegisterEvent(EVENT_HS_DESC, func(lines []ReplyLine) {
+	id, err := c.iRegisterEvent(EVENT_HS_DESC, func(lines []ReplyLine) {
 		segs := strings.Split(string(lines[0].Line), " ")
 		if segs[2] != addr {
 			return
@@ -282,7 +299,7 @@ func (c *Controller) HSAlive(addr string) (bool, error) {
 			done <- false
 		}
 	})
-	if err != nil || !succ {
+	if err != nil {
 		return false, err
 	}
 	err = c.LowController.HSFetch(addr, []string{})
@@ -290,8 +307,8 @@ func (c *Controller) HSAlive(addr string) (bool, error) {
 		return false, err
 	}
 	ret := <-done
-	succ, err = c.iUnregisterEvent(EVENT_HS_DESC)
-	if err != nil || !succ {
+	err = c.iUnregisterEvent(EVENT_HS_DESC, id)
+	if err != nil {
 		return false, err
 	}
 	return ret, nil
@@ -304,8 +321,10 @@ func (c *Controller) workerNotification() {
 		if callback, ok := c.notifHandler[ev]; ok {
 			callback(notif)
 		}
-		if callback, ok := c.iNotifHandler[ev]; ok {
-			callback(notif)
+		if m, ok := c.iNotifHandler[ev]; ok {
+			for _, callback := range m {
+				callback(notif)
+			}
 		}
 	}
 }
