@@ -1,3 +1,3 @@
 module github.com/CodeSpoof/torctrlgo
 
-go 1.22
+go 1.22.1
