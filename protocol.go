@@ -11,6 +11,9 @@ import (
 
 // Defines low-level protocol routines. Specific commands are defined in low.go
 
+// LowController provides a low-level API for communication over TOR's ControlPort protocol.
+//
+// All exported functions are concurrency-safe. Since TOR processes commands sequentially,
 type LowController struct {
 	conn             net.Conn
 	replyLock        sync.Mutex

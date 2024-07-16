@@ -10,8 +10,6 @@ import (
 // Defines commands directly supported by the protocol.
 // Commands that accept multiple arg-formats may have multiple representing functions.
 
-type Cmd string
-
 type ErrOperationUnnecessary error
 type ErrResourceExhausted error
 type ErrProtocolSyntaxError error
@@ -70,6 +68,12 @@ func processErrorLine(line ReplyLine) error {
 	return nil
 }
 
+// Cmd represents a direct command on the ControlPort protocol
+//
+// Usage of Cmd outside the module itself will be mostly obsolete
+// once all commands are implemented on the LowController API.
+type Cmd string
+
 const (
 	CMD_SETCONF                  Cmd = "SETCONF"
 	CMD_RESETCONF                Cmd = "RESETCONF"
@@ -106,19 +110,6 @@ const (
 	CMD_DROPOWNERSHIP            Cmd = "DROPOWNERSHIP"
 	CMD_DROPTIMEOUTS             Cmd = "DROPTIMEOUTS"
 )
-
-type AuthMethod string
-
-const (
-	AUTH_NULL           AuthMethod = "NULL"
-	AUTH_HASHEDPASSWORD AuthMethod = "HASHEDPASSWORD"
-	AUTH_COOKIE         AuthMethod = "COOKIE"
-	AUTH_SAFECOOKIE     AuthMethod = "SAFECOOKIE"
-)
-
-type AuthData struct {
-	Password string
-}
 
 type ProtocolInfo struct {
 	PIVERSION   string

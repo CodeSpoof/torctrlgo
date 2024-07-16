@@ -14,6 +14,9 @@ import (
 
 // Defines high-level API for communication via ControlPort
 
+// Controller provides a high-level API for communication over TOR's ControlPort protocol.
+//
+// Certain functions may declare high concurrency-safety.
 type Controller struct {
 	TorVersion        string
 	TorRCPath         string
@@ -73,6 +76,39 @@ func (c *Controller) loadCompatData() error {
 	return nil
 }
 
+// AuthMethod declares the way of authentication on the ControlPort connection.
+type AuthMethod string
+
+const (
+	// AUTH_NULL No authentication is required.
+	//
+	// To prevent cross-protocol attacks, calling authenticate is still required, even when all methods are disabled.
+	AUTH_NULL AuthMethod = "NULL"
+	// AUTH_HASHEDPASSWORD A password needs to be presented.
+	//
+	// The password's hash is defined in the configuration.
+	AUTH_HASHEDPASSWORD AuthMethod = "HASHEDPASSWORD"
+	// AUTH_COOKIE A cookie-file's contents must be provided.
+	//
+	// The Controller needs to prove its privileges to read one of them.
+	AUTH_COOKIE AuthMethod = "COOKIE"
+	// AUTH_SAFECOOKIE A Challenge must be completed
+	//
+	// The Controller needs to prove its knowledge of a cookie-file, similar to AUTH_COOKIE.
+	AUTH_SAFECOOKIE AuthMethod = "SAFECOOKIE"
+)
+
+// AuthData declares the data passed for authentication.
+//
+//   - Password may be declared for AUTH_HASHEDPASSWORD authentication.
+//   - CookieData may be declared to pass a cookie-file's contents manually.
+//     If CookieData is nil, AUTH_COOKIE and AUTH_SAFECOOKIE authentication will read
+//     the first available cookie-file's contents automatically.
+type AuthData struct {
+	Password   string
+	CookieData []byte
+}
+
 func (c *Controller) Authenticate(method AuthMethod, data AuthData) (bool, error) {
 	succ, err := c.iAuthenticate(method, data)
 	if err != nil || !succ {
@@ -100,15 +136,17 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) (bool, erro
 		if len(c.LowController.lastProtocolInfo.CookieFiles) == 0 {
 			return false, errors.New("no cookie files found")
 		}
-		var b []byte
-		for _, path := range c.LowController.lastProtocolInfo.CookieFiles {
-			f, err := os.Open(path)
-			if err != nil {
-				continue
-			}
-			b, err = io.ReadAll(f)
-			if err != nil {
-				continue
+		b := data.CookieData
+		if b == nil {
+			for _, path := range c.LowController.lastProtocolInfo.CookieFiles {
+				f, err := os.Open(path)
+				if err != nil {
+					continue
+				}
+				b, err = io.ReadAll(f)
+				if err != nil {
+					continue
+				}
 			}
 		}
 		if b == nil {
