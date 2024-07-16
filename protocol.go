@@ -120,8 +120,12 @@ func (c *LowController) workerAssemblePackets() {
 				print("Notification channel is full, discarding oldest...")
 			}
 		} else {
-			ch := <-c.replyChan
-			ch <- reply
+			select {
+			case ch := <-c.replyChan:
+				ch <- reply
+			default:
+				print("Unsolicited response, discarding...")
+			}
 		}
 	}
 }
