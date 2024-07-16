@@ -374,8 +374,11 @@ func (c *Controller) workerNotification() {
 //
 // This function is fully thread-safe, although TOR might rate-limit its usage.
 func (c *Controller) NewIdentity() error {
+	c.availableLock.Lock()
 	if !slices.Contains(c.availableSignals, string(SIGNAL_NEWNYM)) {
+		c.availableLock.Unlock()
 		return errors.New("NEWNYM not available")
 	}
+	c.availableLock.Unlock()
 	return c.LowController.SendSignal(SIGNAL_NEWNYM)
 }
