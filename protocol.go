@@ -9,7 +9,7 @@ import (
 	"sync"
 )
 
-// Defines low-level protocol routines. Specific commands are defined in cmds.go
+// Defines low-level protocol routines. Specific commands are defined in low.go
 
 type LowController struct {
 	conn             net.Conn
