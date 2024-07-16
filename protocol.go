@@ -30,8 +30,8 @@ func NewLowController() *LowController {
 	return &LowController{
 		replyLock:        sync.Mutex{},
 		NotificationChan: make(chan []ReplyLine, 1024),
-		replyChan:        make(chan chan []ReplyLine, 1),
-		lineChan:         make(chan []byte, 255),
+		replyChan:        make(chan chan []ReplyLine, 256),
+		lineChan:         make(chan []byte, 256),
 		lastProtocolInfo: nil,
 	}
 }
