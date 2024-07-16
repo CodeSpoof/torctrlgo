@@ -19,14 +19,17 @@ import (
 //
 // Certain functions may declare high concurrency-safety.
 type Controller struct {
+	genericPropLock   sync.Mutex
 	TorVersion        string
 	TorRCPath         string
 	VersionStatus     string
 	LowController     *LowController
+	notifLock         sync.Mutex
 	notifHandler      map[string]func([]ReplyLine)
 	iNotifLock        sync.Mutex
 	iNotifHandler     map[string]map[int]func([]ReplyLine) //TODO make registering multiple internal listeners possible
 	iNotifCount       map[string]int
+	availableLock     sync.Mutex
 	availableConfigs  map[string][2]string
 	availableInfos    map[string]string
 	availableEvents   []string
@@ -38,7 +41,6 @@ func NewController() *Controller {
 	return &Controller{
 		LowController:     NewLowController(),
 		notifHandler:      make(map[string]func([]ReplyLine)),
-		iNotifLock:        sync.Mutex{},
 		iNotifHandler:     make(map[string]map[int]func([]ReplyLine)),
 		iNotifCount:       make(map[string]int),
 		availableConfigs:  make(map[string][2]string),
@@ -63,10 +65,13 @@ func (c *Controller) loadCompatData() error {
 	if err != nil {
 		return err
 	}
+	c.genericPropLock.Lock()
 	c.TorVersion = info["version"]
 	c.TorRCPath = info["config-file"]
 	c.VersionStatus = info["status/version/current"]
+	c.genericPropLock.Unlock()
 	var segs []string
+	c.availableLock.Lock()
 	for _, config := range strings.Split(info["config/names"], "\r\n") {
 		segs = strings.Split(config, " ")
 		c.availableConfigs[segs[0]] = [2]string{segs[1], strings.TrimSpace(config[len(segs[0])+1+len(segs[1]):])}
@@ -78,6 +83,7 @@ func (c *Controller) loadCompatData() error {
 	c.availableEvents = strings.Split(info["events/names"], " ")
 	c.availableFeatures = strings.Split(info["features/names"], " ")
 	c.availableSignals = strings.Split(info["signal/names"], " ")
+	c.availableLock.Unlock()
 	return nil
 }
 
@@ -125,11 +131,17 @@ func (c *Controller) Authenticate(method AuthMethod, data AuthData) error {
 func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) error {
 	var rep []ReplyLine
 	var err error
-	if c.LowController.lastProtocolInfo == nil && (method == AUTH_COOKIE || method == AUTH_SAFECOOKIE) {
+	c.LowController.lastProtoLock.Lock()
+	lpi := c.LowController.lastProtocolInfo
+	c.LowController.lastProtoLock.Unlock()
+	if lpi == nil && (method == AUTH_COOKIE || method == AUTH_SAFECOOKIE) {
 		_, err = c.LowController.GetProtocolInfo([]string{"1"})
 		if err != nil {
 			return err
 		}
+		c.LowController.lastProtoLock.Lock()
+		lpi = c.LowController.lastProtocolInfo
+		c.LowController.lastProtoLock.Unlock()
 	}
 	switch method {
 	case AUTH_NULL:
@@ -137,12 +149,12 @@ func (c *Controller) iAuthenticate(method AuthMethod, data AuthData) error {
 	case AUTH_HASHEDPASSWORD:
 		return c.LowController.AuthenticateString(data.Password)
 	case AUTH_COOKIE, AUTH_SAFECOOKIE:
-		if len(c.LowController.lastProtocolInfo.CookieFiles) == 0 {
+		if len(lpi.CookieFiles) == 0 {
 			return errors.New("no cookie files found")
 		}
 		b := data.CookieData
 		if b == nil {
-			for _, path := range c.LowController.lastProtocolInfo.CookieFiles {
+			for _, path := range lpi.CookieFiles {
 				f, err := os.Open(path)
 				if err != nil {
 					continue
@@ -239,6 +251,8 @@ const (
 )
 
 func (c *Controller) updateEvents() error {
+	c.iNotifLock.Lock()
+	c.notifLock.Lock()
 	keys := make([]string, len(c.notifHandler)+len(c.iNotifHandler))
 	i := 0
 	for k := range c.notifHandler {
@@ -250,11 +264,17 @@ func (c *Controller) updateEvents() error {
 		i++
 	}
 	slices.Sort(keys)
+	defer func() {
+		c.iNotifLock.Unlock()
+		c.notifLock.Unlock()
+	}()
 	return c.LowController.SetEvents(slices.Compact(keys))
 }
 
 func (c *Controller) RegisterEvent(code EventCode, callback func([]ReplyLine)) error {
+	c.notifLock.Lock()
 	c.notifHandler[string(code)] = callback
+	c.notifLock.Unlock()
 	return c.updateEvents()
 }
 
@@ -262,16 +282,22 @@ func (c *Controller) iRegisterEvent(code EventCode, callback func([]ReplyLine)) 
 	c.iNotifLock.Lock()
 	var id int
 	if val, ok := c.iNotifCount[string(code)]; ok {
-		id = val + 1
+		id = val
 		c.iNotifCount[string(code)]++
-		c.iNotifHandler[string(code)][id] = callback
+	} else {
+		id = 0
+		c.iNotifCount[string(code)] = 1
+		c.iNotifHandler[string(code)] = make(map[int]func([]ReplyLine))
 	}
-	defer c.iNotifLock.Unlock()
+	c.iNotifHandler[string(code)][id] = callback
+	c.iNotifLock.Unlock()
 	return id, c.updateEvents()
 }
 
 func (c *Controller) UnregisterEvent(code EventCode) error {
+	c.notifLock.Lock()
 	delete(c.notifHandler, string(code))
+	c.notifLock.Unlock()
 	return c.updateEvents()
 }
 
@@ -282,7 +308,7 @@ func (c *Controller) iUnregisterEvent(code EventCode, id int) error {
 		delete(c.iNotifHandler, string(code))
 		delete(c.iNotifCount, string(code))
 	}
-	defer c.iNotifLock.Unlock()
+	c.iNotifLock.Unlock()
 	return c.updateEvents()
 }
 
@@ -321,11 +347,13 @@ func (c *Controller) workerNotification() {
 		if callback, ok := c.notifHandler[ev]; ok {
 			callback(notif)
 		}
+		c.iNotifLock.Lock()
 		if m, ok := c.iNotifHandler[ev]; ok {
 			for _, callback := range m {
 				callback(notif)
 			}
 		}
+		c.iNotifLock.Unlock()
 	}
 }
 

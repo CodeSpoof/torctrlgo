@@ -18,8 +18,9 @@ type LowController struct {
 	conn             net.Conn
 	replyLock        sync.Mutex
 	NotificationChan chan []ReplyLine
-	replyChan        chan chan []ReplyLine
+	replyChan        chan *chan []ReplyLine
 	lineChan         chan []byte
+	lastProtoLock    sync.Mutex
 	lastProtocolInfo *ProtocolInfo
 }
 
@@ -31,9 +32,8 @@ type ReplyLine struct {
 
 func NewLowController() *LowController {
 	return &LowController{
-		replyLock:        sync.Mutex{},
 		NotificationChan: make(chan []ReplyLine, 1024),
-		replyChan:        make(chan chan []ReplyLine, 256),
+		replyChan:        make(chan *chan []ReplyLine, 256),
 		lineChan:         make(chan []byte, 256),
 		lastProtocolInfo: nil,
 	}
@@ -52,7 +52,7 @@ func (c *LowController) Open(addr string) (err error) {
 func (c *LowController) sendPacket(data []byte) ([]ReplyLine, error) {
 	c.replyLock.Lock()
 	ch := make(chan []ReplyLine)
-	c.replyChan <- ch
+	c.replyChan <- &ch
 	_, err := c.conn.Write(data)
 	c.replyLock.Unlock()
 	if err != nil {
@@ -124,7 +124,7 @@ func (c *LowController) workerAssemblePackets() {
 		} else {
 			select {
 			case ch := <-c.replyChan:
-				ch <- reply
+				*ch <- reply
 			default:
 				print("Unsolicited response, discarding...")
 			}

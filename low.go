@@ -127,7 +127,7 @@ func (c *LowController) iSetConf(cmd Cmd, confs map[string]string) error {
 		st := k
 		if len(v) > 0 {
 			st += "="
-			if strings.ContainsAny(v, "\r\n\"\t") {
+			if strings.Contains(v, "\"") {
 				st += writeQString(v)
 			} else {
 				st += v
@@ -135,7 +135,7 @@ func (c *LowController) iSetConf(cmd Cmd, confs map[string]string) error {
 		}
 		l = append(l, st)
 	}
-	rep, err := c.sendPacket([]byte(string(cmd) + " " + strings.Join(l, " ")))
+	rep, err := c.sendPacket([]byte(string(cmd) + " " + strings.Join(l, " ") + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -326,12 +326,14 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 			}
 		}
 	}
+	c.lastProtoLock.Lock()
 	c.lastProtocolInfo = &ret
+	c.lastProtoLock.Unlock()
 	return &ret, nil
 }
 
 func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (serverHash []byte, serverNonce []byte, err error) {
-	rep, err := c.sendPacket([]byte(string(CMD_AUTHCHALLENGE) + " " + chllngType + " " + hex.EncodeToString(clientNonce)))
+	rep, err := c.sendPacket([]byte(string(CMD_AUTHCHALLENGE) + " " + chllngType + " " + hex.EncodeToString(clientNonce) + "\r\n"))
 	if err != nil {
 		return
 	}
