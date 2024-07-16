@@ -3,7 +3,6 @@ package torctrlgo
 import (
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"slices"
 	"strings"
 )
@@ -186,7 +185,7 @@ func (c *LowController) GetConf(names []string) (map[string]string, error) {
 }
 
 func (c *LowController) SetEvents(codes []string) (bool, error) {
-	rep, err := c.sendPacket([]byte(fmt.Sprintf("%s %s\r\n", CMD_SETEVENTS, strings.Join(codes, " "))))
+	rep, err := c.sendPacket([]byte(string(CMD_SETEVENTS) + " " + strings.Join(codes, " ") + "\r\n"))
 	if err != nil {
 		return false, err
 	}
@@ -248,7 +247,7 @@ const (
 )
 
 func (c *LowController) SendSignal(signal Signal) error {
-	rep, err := c.sendPacket([]byte(fmt.Sprintf("%s %s\r\n", CMD_SIGNAL, signal)))
+	rep, err := c.sendPacket([]byte(string(CMD_SIGNAL) + " " + string(signal) + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -301,7 +300,7 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 		AuthMethods: make([]string, 0),
 		CookieFiles: make([]string, 0),
 	}
-	rep, err := c.sendPacket([]byte(fmt.Sprintf("%s %s\r\n", CMD_PROTOCOLINFO, strings.Join(versions, " "))))
+	rep, err := c.sendPacket([]byte(string(CMD_PROTOCOLINFO) + " " + strings.Join(versions, " ") + "\r\n"))
 	if err != nil {
 		return nil, err
 	}
@@ -341,7 +340,7 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 }
 
 func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (serverHash []byte, serverNonce []byte, err error) {
-	rep, err := c.sendPacket([]byte(fmt.Sprintf("%s %s %s\r\n", CMD_AUTHCHALLENGE, chllngType, hex.EncodeToString(clientNonce))))
+	rep, err := c.sendPacket([]byte(string(CMD_AUTHCHALLENGE) + " " + chllngType + " " + hex.EncodeToString(clientNonce)))
 	if err != nil {
 		return
 	}
