@@ -274,6 +274,14 @@ func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
 	return ret, nil
 }
 
+func (c *LowController) Quit() error {
+	rep, err := c.sendPacket([]byte(string(CMD_QUIT) + "\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
 func (c *LowController) Resolve(addr string, reverse bool) error {
 	s := string(CMD_RESOLVE)
 	if reverse {
