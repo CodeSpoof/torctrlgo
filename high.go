@@ -454,7 +454,7 @@ func (c *Controller) NewListener(virtPort uint16, keyBlob string, auths []HSAuth
 
 func (c *Controller) NewForwarder(ports []HSPortConfig, keyBlob string, auths []HSAuthConfig) (*HiddenService, error) {
 	if len(keyBlob) == 0 {
-		keyBlob = GENERATE_ED25519_V3
+		keyBlob = GENERATE_BEST
 	}
 	config, err := c.LowController.AddOnion(KEYTYPE_NEW, keyBlob, nil, 0, ports, auths)
 	return &HiddenService{
