@@ -394,7 +394,7 @@ const (
 )
 
 func (c *LowController) CloseStream(streamID string, reason RelayEndReason, flags []string) error {
-	b := append([]byte("CLOSESTREAM"+streamID), byte(reason))
+	b := append([]byte("CLOSESTREAM "+streamID+" "), byte(reason))
 	if len(flags) > 0 {
 		b = append(b, []byte(" "+strings.Join(flags, " "))...)
 	}
