@@ -78,12 +78,12 @@ type ProtocolInfo struct {
 	CookieFiles []string
 }
 
-func (c *LowController) iSetConf(cmd string, confs map[string]string) error {
-	if len(confs) == 0 {
-		return errors.New("configs can't be empty")
+func (c *LowController) iSetConf(cmd string, configs map[string]string) error {
+	if len(configs) == 0 {
+		return ErrSyntaxCommandArgument(errors.New("configs can't be empty"))
 	}
-	l := make([]string, len(confs))
-	for k, v := range confs {
+	l := make([]string, len(configs))
+	for k, v := range configs {
 		st := k
 		if len(v) > 0 {
 			st += "="
