@@ -427,10 +427,11 @@ func (c *LowController) Quit() error {
 }
 
 func (c *LowController) UseFeature(features []string) error {
-	if len(features) == 0 {
-		return wrapError("features can't be empty", ErrSyntaxCommandArgument)
+	st := "USEFEATURE"
+	if len(features) > 0 {
+		st += " " + strings.Join(features, " ")
 	}
-	rep, err := c.sendPacket([]byte("USEFEATURE " + strings.Join(features, " ") + "\r\n"))
+	rep, err := c.sendPacket([]byte(st + "\r\n"))
 	if err != nil {
 		return err
 	}
