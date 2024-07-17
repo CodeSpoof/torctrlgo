@@ -556,8 +556,20 @@ func (c *LowController) DropGuards() error {
 	return processErrorLine(rep[0])
 }
 
-func (c *LowController) HSFetch(addressOrDescriptor string, servers []string) error {
-	cmd := "HSFETCH " + addressOrDescriptor
+func (c *LowController) HSFetch(addressOrDescriptorID string, servers []string) error {
+	cmd := "HSFETCH " + addressOrDescriptorID
+	if addressOrDescriptorID[:3] == "v2-" {
+		if len(servers) == 0 {
+			return wrapError("servers can't be empty for HSFETCH using v2-descriptorID", ErrSyntaxCommandArgument)
+		}
+		if len(addressOrDescriptorID) != 35 {
+			return wrapError("invalid version 2 descriptor ID length", ErrSyntaxCommandArgument)
+		}
+	} else if addressOrDescriptorID[:3] == "v3-" {
+		return wrapError("descriptorID is only valid for version 2", ErrSyntaxCommandArgument)
+	} else if len(addressOrDescriptorID) != 16 && len(addressOrDescriptorID) != 56 {
+		return wrapError("invalid address length (version 2/3)", ErrSyntaxCommandArgument)
+	}
 	if len(servers) > 0 {
 		cmd += strings.Join(append([]string{""}, servers...), " SERVER=")
 	}
