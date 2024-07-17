@@ -194,10 +194,15 @@ type Signal string
 
 const (
 	SIGNAL_RELOAD        Signal = "RELOAD"
+	SIGNAL_HUP           Signal = "HUP" // Same as SIGNAL_RELOAD
 	SIGNAL_SHUTDOWN      Signal = "SHUTDOWN"
+	SIGNAL_INT           Signal = "INT" // Same as SIGNAL_SHUTDOWN
 	SIGNAL_DUMP          Signal = "DUMP"
+	SIGNAL_USR1          Signal = "USR1" // Same as SIGNAL_DUMP
 	SIGNAL_DEBUG         Signal = "DEBUG"
+	SIGNAL_USR2          Signal = "USR2" // Same as SIGNAL_DEBUG
 	SIGNAL_HALT          Signal = "HALT"
+	SIGNAL_TERM          Signal = "TERM" // Same as SIGNAL_HALT
 	SIGNAL_CLEARDNSCACHE Signal = "CLEARDNSCACHE"
 	SIGNAL_NEWNYM        Signal = "NEWNYM"
 	SIGNAL_HEARTBEAT     Signal = "HEARTBEAT"
