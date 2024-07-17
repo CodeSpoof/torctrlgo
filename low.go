@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -13,59 +14,61 @@ import (
 // Defines commands directly supported by the protocol.
 // Commands that accept multiple arg-formats may have multiple representing functions.
 
-type ErrOperationUnnecessary error
-type ErrResourceExhausted error
-type ErrProtocolSyntaxError error
-type ErrUnrecognizedCommand error
-type ErrUnimplementedCommand error
-type ErrSyntaxCommandArgument error
-type ErrUnrecognizedCommandArgument error
-type ErrAuthenticationRequired error
-type ErrBadAuthentication error
-type ErrUnspecified error
-type ErrInternal error
-type ErrUnrecognizedEntity error
-type ErrInvalidConfigurationValue error
-type ErrInvalidDescriptor error
-type ErrUnmanagedEntity error
+var (
+	ErrOperationUnnecessary        = errors.New("operation was unnecessary")
+	ErrResourceExhausted           = errors.New("resource exhausted")
+	ErrProtocolSyntaxError         = errors.New("syntax error: protocol")
+	ErrUnrecognizedCommand         = errors.New("unrecognized command")
+	ErrUnimplementedCommand        = errors.New("unimplemented command")
+	ErrSyntaxCommandArgument       = errors.New("syntax error in command argument")
+	ErrUnrecognizedCommandArgument = errors.New("unrecognized command argument")
+	ErrAuthenticationRequired      = errors.New("authentication required")
+	ErrBadAuthentication           = errors.New("bad authentication")
+	ErrUnspecified                 = errors.New("unspecified Tor error")
+	ErrInternal                    = errors.New("internal error")
+	ErrUnrecognizedEntity          = errors.New("unrecognized entity")
+	ErrInvalidConfigurationValue   = errors.New("invalid configuration value")
+	ErrInvalidDescriptor           = errors.New("invalid descriptor")
+	ErrUnmanagedEntity             = errors.New("unmanaged entity")
 
-type ErrUnknown error
+	ErrUnknown = errors.New("unknown status code")
+)
 
 func processErrorLine(line ReplyLine) error {
 	switch line.StatusCode {
 	case 251:
-		return ErrOperationUnnecessary(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrOperationUnnecessary)
 	case 451:
-		return ErrResourceExhausted(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrResourceExhausted)
 	case 500:
-		return ErrProtocolSyntaxError(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrProtocolSyntaxError)
 	case 510:
-		return ErrUnrecognizedCommand(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrUnrecognizedCommand)
 	case 511:
-		return ErrUnimplementedCommand(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrUnimplementedCommand)
 	case 512:
-		return ErrSyntaxCommandArgument(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrSyntaxCommandArgument)
 	case 513:
-		return ErrUnrecognizedCommandArgument(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrUnrecognizedCommandArgument)
 	case 514:
-		return ErrAuthenticationRequired(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrAuthenticationRequired)
 	case 515:
-		return ErrBadAuthentication(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrBadAuthentication)
 	case 550:
-		return ErrUnspecified(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrUnspecified)
 	case 551:
-		return ErrInternal(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrInternal)
 	case 552:
-		return ErrUnrecognizedEntity(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrUnrecognizedEntity)
 	case 553:
-		return ErrInvalidConfigurationValue(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrInvalidConfigurationValue)
 	case 554:
-		return ErrInvalidDescriptor(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrInvalidDescriptor)
 	case 555:
-		return ErrUnmanagedEntity(errors.New(string(line.Line)))
+		return fmt.Errorf(string(line.Line)+": %w", ErrUnmanagedEntity)
 	default:
 		if line.StatusCode != 250 && line.StatusCode != 252 {
-			return ErrUnknown(errors.New(string(line.Line)))
+			return fmt.Errorf(string(line.Line)+": %w", ErrUnknown)
 		}
 	}
 	return nil
@@ -80,7 +83,7 @@ type ProtocolInfo struct {
 
 func (c *LowController) iSetConf(cmd string, configs map[string]string) error {
 	if len(configs) == 0 {
-		return ErrSyntaxCommandArgument(errors.New("configs can't be empty"))
+		return fmt.Errorf("configs can't be empty: %w", ErrSyntaxCommandArgument)
 	}
 	l := make([]string, len(configs))
 	for k, v := range configs {
@@ -220,7 +223,7 @@ func (c *LowController) SendSignal(signal Signal) error {
 
 func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, error) {
 	if len(addrs) == 0 {
-		return nil, ErrSyntaxCommandArgument(errors.New("addresses can't be empty"))
+		return nil, fmt.Errorf("addresses can't be empty: %w", ErrSyntaxCommandArgument)
 	}
 	st := "MAPADDRESS"
 	for k, v := range addrs {
@@ -230,12 +233,15 @@ func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, 
 	if err != nil {
 		return nil, err
 	}
-	err = processErrorLine(rep[0])
-	if err != nil {
-		return nil, err
-	}
 	ret := make(map[string]string)
 	for _, line := range rep {
+		err = processErrorLine(line)
+		if err != nil {
+			if errors.Is(err, ErrSyntaxCommandArgument) {
+				continue
+			}
+			return nil, err
+		}
 		if match := patternConfigValue.FindStringSubmatch(string(line.Line)); match != nil {
 			ret[match[1]] = strings.Trim(match[2], "\r\n ")
 		}
@@ -272,14 +278,14 @@ func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
 func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose string) (int, error) {
 	st := "EXTENDCIRCUIT " + strconv.Itoa(circuitID)
 	if circuitID != 0 && len(path) == 0 {
-		return 0, ErrSyntaxCommandArgument(errors.New("path can't be empty for extending existing circuits"))
+		return 0, fmt.Errorf("path can't be empty for extending existing circuits: %w", ErrSyntaxCommandArgument)
 	}
 	if len(path) > 0 {
 		st += " " + strings.Join(path, ",")
 	}
 	if len(purpose) > 0 {
 		if purpose != "general" && purpose != "controller" {
-			return 0, ErrSyntaxCommandArgument(errors.New("purpose must be \"general\" or \"controller\""))
+			return 0, fmt.Errorf("purpose must be \"general\" or \"controller\": %w", ErrSyntaxCommandArgument)
 		}
 		st += " purpose=" + purpose
 	}
@@ -304,7 +310,7 @@ func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
 
 func (c *LowController) SetRouterPurpose(nicknameOrKey, purpose string) error {
 	if purpose != "general" && purpose != "controller" && purpose != "bridge" {
-		return ErrUnrecognizedEntity(errors.New("\"" + purpose + "\" is not a valid router purpose"))
+		return fmt.Errorf("\""+purpose+"\" is not a valid router purpose: %w", ErrUnrecognizedEntity)
 	}
 	rep, err := c.sendPacket([]byte("SETROUTERPURPOSE " + nicknameOrKey + " " + purpose + "\r\n"))
 	if err != nil {
@@ -329,13 +335,13 @@ func (c *LowController) PostDescriptor(purpose string, cache string, descriptor 
 	st := "+POSTDESCRIPTOR"
 	if len(purpose) > 0 {
 		if purpose != "general" && purpose != "controller" && purpose != "bridge" {
-			return ErrUnrecognizedEntity(errors.New("\"" + purpose + "\" is not a valid router purpose"))
+			return fmt.Errorf("\""+purpose+"\" is not a valid router purpose: %w", ErrUnrecognizedEntity)
 		}
 		st += " purpose=" + purpose
 	}
 	if len(cache) > 0 {
 		if cache != "yes" && cache != "no" {
-			return ErrUnrecognizedEntity(errors.New("\"" + cache + "\" is not a valid option for cache"))
+			return fmt.Errorf("\""+cache+"\" is not a valid option for cache: %w", ErrUnrecognizedEntity)
 		}
 		st += " cache=" + cache
 	}
@@ -411,7 +417,7 @@ func (c *LowController) Quit() error {
 
 func (c *LowController) UseFeature(features []string) error {
 	if len(features) == 0 {
-		return ErrSyntaxCommandArgument(errors.New("features can't be empty"))
+		return fmt.Errorf("features can't be empty: %w", ErrSyntaxCommandArgument)
 	}
 	rep, err := c.sendPacket([]byte("USEFEATURE " + strings.Join(features, " ") + "\r\n"))
 	if err != nil {
@@ -596,7 +602,7 @@ func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string
 		st += " MaxStreams=" + strconv.Itoa(int(maxStreams))
 	}
 	if len(ports) == 0 {
-		return nil, ErrSyntaxCommandArgument(errors.New("missing port configuration"))
+		return nil, fmt.Errorf("missing port configuration: %w", ErrSyntaxCommandArgument)
 	}
 	for _, portConfig := range ports {
 		st += " Port=" + strconv.Itoa(int(portConfig.VirtPort))
