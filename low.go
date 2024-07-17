@@ -71,49 +71,6 @@ func processErrorLine(line ReplyLine) error {
 	return nil
 }
 
-// Cmd represents a direct command on the ControlPort protocol
-//
-// Usage of Cmd outside the module itself will be mostly obsolete
-// once all commands are implemented on the LowController API.
-type Cmd string
-
-const (
-	CMD_SETCONF                  Cmd = "SETCONF"
-	CMD_RESETCONF                Cmd = "RESETCONF"
-	CMD_GETCONF                  Cmd = "GETCONF"
-	CMD_SETEVENTS                Cmd = "SETEVENTS"
-	CMD_AUTHENTICATE             Cmd = "AUTHENTICATE"
-	CMD_SAVECONF                 Cmd = "SAVECONF"
-	CMD_SIGNAL                   Cmd = "SIGNAL"
-	CMD_MAPADDRESS               Cmd = "MAPADDRESS"
-	CMD_GETINFO                  Cmd = "GETINFO"
-	CMD_EXTENDCIRCUIT            Cmd = "EXTENDCIRCUIT"
-	CMD_SETCIRCUITPURPOSE        Cmd = "SETCIRCUITPURPOSE"
-	CMD_SETROUTERPURPOSE         Cmd = "SETROUTERPURPOSE"
-	CMD_ATTACHSTREAM             Cmd = "ATTACHSTREAM"
-	CMD_POSTDESCRIPTOR           Cmd = "+POSTDESCRIPTOR"
-	CMD_REDIRECTSTREAM           Cmd = "REDIRECTSTREAM"
-	CMD_CLOSESTREAM              Cmd = "CLOSESTREAM"
-	CMD_CLOSECIRCUIT             Cmd = "CLOSECIRCUIT"
-	CMD_QUIT                     Cmd = "QUIT"
-	CMD_USEFEATURE               Cmd = "USEFEATURE"
-	CMD_RESOLVE                  Cmd = "RESOLVE"
-	CMD_PROTOCOLINFO             Cmd = "PROTOCOLINFO"
-	CMD_LOADCONF                 Cmd = "+LOADCONF"
-	CMD_TAKEOWNERSHIP            Cmd = "TAKEOWNERSHIP"
-	CMD_AUTHCHALLENGE            Cmd = "AUTHCHALLENGE"
-	CMD_DROPGUARDS               Cmd = "DROPGUARDS"
-	CMD_HSFETCH                  Cmd = "HSFETCH"
-	CMD_ADD_ONION                Cmd = "ADD_ONION"
-	CMD_DEL_ONION                Cmd = "DEL_ONION"
-	CMD_HSPOST                   Cmd = "+HSPOST"
-	CMD_ONION_CLIENT_AUTH_ADD    Cmd = "ONION_CLIENT_AUTH_ADD"
-	CMD_ONION_CLIENT_AUTH_REMOVE Cmd = "ONION_CLIENT_AUTH_REMOVE"
-	CMD_ONION_CLIENT_AUTH_VIEW   Cmd = "ONION_CLIENT_AUTH_VIEW"
-	CMD_DROPOWNERSHIP            Cmd = "DROPOWNERSHIP"
-	CMD_DROPTIMEOUTS             Cmd = "DROPTIMEOUTS"
-)
-
 type ProtocolInfo struct {
 	PIVERSION   string
 	TorVersion  string
@@ -121,7 +78,7 @@ type ProtocolInfo struct {
 	CookieFiles []string
 }
 
-func (c *LowController) iSetConf(cmd Cmd, confs map[string]string) error {
+func (c *LowController) iSetConf(cmd string, confs map[string]string) error {
 	if len(confs) == 0 {
 		return errors.New("configs can't be empty")
 	}
@@ -146,15 +103,15 @@ func (c *LowController) iSetConf(cmd Cmd, confs map[string]string) error {
 }
 
 func (c *LowController) SetConf(confs map[string]string) error {
-	return c.iSetConf(CMD_SETCONF, confs)
+	return c.iSetConf("SETCONF", confs)
 }
 
 func (c *LowController) ResetConf(confs map[string]string) error {
-	return c.iSetConf(CMD_RESETCONF, confs)
+	return c.iSetConf("RESETCONF", confs)
 }
 
 func (c *LowController) GetConf(names []string) (map[string]string, error) {
-	rep, err := c.sendPacket([]byte(string(CMD_GETCONF) + " " + strings.Join(names, " ") + "\r\n"))
+	rep, err := c.sendPacket([]byte("GETCONF " + strings.Join(names, " ") + "\r\n"))
 	if err != nil {
 		return nil, err
 	}
@@ -176,7 +133,7 @@ func (c *LowController) GetConf(names []string) (map[string]string, error) {
 }
 
 func (c *LowController) SetEvents(codes []string) error {
-	rep, err := c.sendPacket([]byte(string(CMD_SETEVENTS) + " " + strings.Join(codes, " ") + "\r\n"))
+	rep, err := c.sendPacket([]byte("SETEVENTS " + strings.Join(codes, " ") + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -184,7 +141,7 @@ func (c *LowController) SetEvents(codes []string) error {
 }
 
 func (c *LowController) AuthenticateNull() error {
-	rep, err := c.sendPacket([]byte(string(CMD_AUTHENTICATE) + "\r\n"))
+	rep, err := c.sendPacket([]byte("AUTHENTICATE\r\n"))
 	if err != nil {
 		return err
 	}
@@ -192,7 +149,7 @@ func (c *LowController) AuthenticateNull() error {
 }
 
 func (c *LowController) AuthenticateBytes(data []byte) error {
-	rep, err := c.sendPacket([]byte(string(CMD_AUTHENTICATE) + " " + hex.EncodeToString(data) + "\r\n"))
+	rep, err := c.sendPacket([]byte("AUTHENTICATE " + hex.EncodeToString(data) + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -200,7 +157,7 @@ func (c *LowController) AuthenticateBytes(data []byte) error {
 }
 
 func (c *LowController) AuthenticateString(data string) error {
-	rep, err := c.sendPacket([]byte(string(CMD_AUTHENTICATE) + " " + writeQString(data) + "\r\n"))
+	rep, err := c.sendPacket([]byte("AUTHENTICATE " + writeQString(data) + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -208,7 +165,7 @@ func (c *LowController) AuthenticateString(data string) error {
 }
 
 func (c *LowController) SaveConf(force bool) error {
-	st := string(CMD_SAVECONF)
+	st := "SAVECONF"
 	if force {
 		st += " FORCE"
 	}
@@ -235,7 +192,7 @@ const (
 )
 
 func (c *LowController) SendSignal(signal Signal) error {
-	rep, err := c.sendPacket([]byte(string(CMD_SIGNAL) + " " + string(signal) + "\r\n"))
+	rep, err := c.sendPacket([]byte("SIGNAL " + string(signal) + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -246,7 +203,7 @@ func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, 
 	if len(addrs) == 0 {
 		return nil, ErrSyntaxCommandArgument(errors.New("addresses can't be empty"))
 	}
-	st := string(CMD_MAPADDRESS)
+	st := "MAPADDRESS"
 	for k, v := range addrs {
 		st += " " + k + "=" + v
 	}
@@ -268,7 +225,7 @@ func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, 
 }
 
 func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
-	rep, err := c.sendPacket([]byte(strings.Join(append([]string{string(CMD_GETINFO)}, keywords...), " ") + "\r\n"))
+	rep, err := c.sendPacket([]byte(strings.Join(append([]string{"GETINFO"}, keywords...), " ") + "\r\n"))
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +251,7 @@ func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
 }
 
 func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose string) (int, error) {
-	st := string(CMD_EXTENDCIRCUIT) + " " + strconv.Itoa(circuitID)
+	st := "EXTENDCIRCUIT " + strconv.Itoa(circuitID)
 	if circuitID != 0 && len(path) == 0 {
 		return 0, ErrSyntaxCommandArgument(errors.New("path can't be empty for extending existing circuits"))
 	}
@@ -323,7 +280,7 @@ func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose stri
 }
 
 func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
-	rep, err := c.sendPacket([]byte(string(CMD_SETCIRCUITPURPOSE) + " " + strconv.Itoa(circuitID) + " purpose=" + purpose + "\r\n"))
+	rep, err := c.sendPacket([]byte("SETCIRCUITPURPOSE " + strconv.Itoa(circuitID) + " purpose=" + purpose + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -334,7 +291,7 @@ func (c *LowController) SetRouterPurpose(nicknameOrKey, purpose string) error {
 	if purpose != "general" && purpose != "controller" && purpose != "bridge" {
 		return ErrUnrecognizedEntity(errors.New("\"" + purpose + "\" is not a valid router purpose"))
 	}
-	rep, err := c.sendPacket([]byte(string(CMD_SETROUTERPURPOSE) + " " + nicknameOrKey + " " + purpose + "\r\n"))
+	rep, err := c.sendPacket([]byte("SETROUTERPURPOSE " + nicknameOrKey + " " + purpose + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -342,7 +299,7 @@ func (c *LowController) SetRouterPurpose(nicknameOrKey, purpose string) error {
 }
 
 func (c *LowController) AttachStream(streamID string, circuitID, hopNum int) error {
-	st := string(CMD_ATTACHSTREAM) + " " + streamID + strconv.Itoa(circuitID)
+	st := "ATTACHSTREAM " + streamID + strconv.Itoa(circuitID)
 	if hopNum > 0 {
 		st += " HOP=" + strconv.Itoa(hopNum)
 	}
@@ -354,7 +311,7 @@ func (c *LowController) AttachStream(streamID string, circuitID, hopNum int) err
 }
 
 func (c *LowController) PostDescriptor(purpose string, cache string, descriptor string) error {
-	st := string(CMD_POSTDESCRIPTOR)
+	st := "+POSTDESCRIPTOR"
 	if len(purpose) > 0 {
 		if purpose != "general" && purpose != "controller" && purpose != "bridge" {
 			return ErrUnrecognizedEntity(errors.New("\"" + purpose + "\" is not a valid router purpose"))
@@ -375,7 +332,7 @@ func (c *LowController) PostDescriptor(purpose string, cache string, descriptor 
 }
 
 func (c *LowController) RedirectStream(streamID string, address string, port uint16) error {
-	st := string(CMD_REDIRECTSTREAM) + " " + streamID + " " + address
+	st := "REDIRECTSTREAM " + streamID + " " + address
 	if port > 0 {
 		st += " " + strconv.Itoa(int(port))
 	}
@@ -406,7 +363,7 @@ const (
 )
 
 func (c *LowController) CloseStream(streamID string, reason RelayEndReason, flags []string) error {
-	b := append([]byte(string(CMD_CLOSESTREAM)+streamID), byte(reason))
+	b := append([]byte("CLOSESTREAM"+streamID), byte(reason))
 	if len(flags) > 0 {
 		b = append(b, []byte(" "+strings.Join(flags, " "))...)
 	}
@@ -418,7 +375,7 @@ func (c *LowController) CloseStream(streamID string, reason RelayEndReason, flag
 }
 
 func (c *LowController) CloseCircuit(circuitID int, flags []string) error {
-	st := string(CMD_CLOSECIRCUIT) + " " + strconv.Itoa(circuitID)
+	st := "CLOSECIRCUIT " + strconv.Itoa(circuitID)
 	if len(flags) > 0 {
 		st += " " + strings.Join(flags, " ")
 	}
@@ -430,7 +387,7 @@ func (c *LowController) CloseCircuit(circuitID int, flags []string) error {
 }
 
 func (c *LowController) Quit() error {
-	rep, err := c.sendPacket([]byte(string(CMD_QUIT) + "\r\n"))
+	rep, err := c.sendPacket([]byte("QUIT\r\n"))
 	if err != nil {
 		return err
 	}
@@ -438,7 +395,10 @@ func (c *LowController) Quit() error {
 }
 
 func (c *LowController) UseFeature(features []string) error {
-	rep, err := c.sendPacket([]byte(string(CMD_USEFEATURE) + " " + strings.Join(features, " ") + "\r\n"))
+	if len(features) == 0 {
+		return ErrSyntaxCommandArgument(errors.New("features can't be empty"))
+	}
+	rep, err := c.sendPacket([]byte("USEFEATURE " + strings.Join(features, " ") + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -446,7 +406,7 @@ func (c *LowController) UseFeature(features []string) error {
 }
 
 func (c *LowController) Resolve(addr string, reverse bool) error {
-	s := string(CMD_RESOLVE)
+	s := "RESOLVE"
 	if reverse {
 		s += " mode=reverse"
 	}
@@ -462,7 +422,7 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 		AuthMethods: make([]string, 0),
 		CookieFiles: make([]string, 0),
 	}
-	rep, err := c.sendPacket([]byte(string(CMD_PROTOCOLINFO) + " " + strings.Join(versions, " ") + "\r\n"))
+	rep, err := c.sendPacket([]byte("PROTOCOLINFO " + strings.Join(versions, " ") + "\r\n"))
 	if err != nil {
 		return nil, err
 	}
@@ -504,7 +464,7 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 }
 
 func (c *LowController) LoadConf(config string) error {
-	rep, err := c.sendPacket([]byte(string(CMD_LOADCONF) + "\r\n" + config + "\r\n.\r\n"))
+	rep, err := c.sendPacket([]byte("+LOADCONF\r\n" + config + "\r\n.\r\n"))
 	if err != nil {
 		return err
 	}
@@ -512,7 +472,7 @@ func (c *LowController) LoadConf(config string) error {
 }
 
 func (c *LowController) TakeOwnership() error {
-	rep, err := c.sendPacket([]byte(string(CMD_TAKEOWNERSHIP) + "\r\n"))
+	rep, err := c.sendPacket([]byte("TAKEOWNERSHIP\r\n"))
 	if err != nil {
 		return err
 	}
@@ -520,7 +480,7 @@ func (c *LowController) TakeOwnership() error {
 }
 
 func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (serverHash []byte, serverNonce []byte, err error) {
-	rep, err := c.sendPacket([]byte(string(CMD_AUTHCHALLENGE) + " " + chllngType + " " + hex.EncodeToString(clientNonce) + "\r\n"))
+	rep, err := c.sendPacket([]byte("AUTHCHALLENGE " + chllngType + " " + hex.EncodeToString(clientNonce) + "\r\n"))
 	if err != nil {
 		return
 	}
@@ -553,7 +513,7 @@ func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (se
 }
 
 func (c *LowController) DropGuards() error {
-	rep, err := c.sendPacket([]byte(string(CMD_DROPGUARDS) + "\r\n"))
+	rep, err := c.sendPacket([]byte("DROPGUARDS\r\n"))
 	if err != nil {
 		return err
 	}
@@ -561,7 +521,7 @@ func (c *LowController) DropGuards() error {
 }
 
 func (c *LowController) HSFetch(addressOrDescriptor string, servers []string) error {
-	cmd := string(CMD_HSFETCH) + " " + addressOrDescriptor
+	cmd := "HSFETCH " + addressOrDescriptor
 	if len(servers) > 0 {
 		cmd += strings.Join(append([]string{""}, servers...), " SERVER=")
 	}
@@ -613,7 +573,7 @@ type HSConfigReply struct {
 }
 
 func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string, maxStreams uint16, ports []HSPortConfig, auths []HSAuthConfig) (*HSConfigReply, error) {
-	st := string(CMD_ADD_ONION) + " " + string(keyType) + ":" + keyBlob
+	st := "ADD_ONION " + string(keyType) + ":" + keyBlob
 	if len(flags) > 0 {
 		st += " Flags=" + strings.Join(flags, " ")
 	}
@@ -668,7 +628,7 @@ func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string
 }
 
 func (c *LowController) DelOnion(HSAddr string) error {
-	rep, err := c.sendPacket([]byte(string(CMD_DEL_ONION) + " " + HSAddr + "\r\n"))
+	rep, err := c.sendPacket([]byte("DEL_ONION " + HSAddr + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -676,7 +636,7 @@ func (c *LowController) DelOnion(HSAddr string) error {
 }
 
 func (c *LowController) HSPost(servers []string, HSAddr string, descriptor string) error {
-	st := string(CMD_HSPOST) + strings.Join(append([]string{""}, servers...), " SERVER=")
+	st := "+HSPOST" + strings.Join(append([]string{""}, servers...), " SERVER=")
 	if len(HSAddr) > 0 {
 		st += " HSADDRESS=" + HSAddr
 	}
@@ -696,7 +656,7 @@ type OnionClientAuth struct {
 }
 
 func (c *LowController) OnionClientAuthAdd(auth OnionClientAuth) error {
-	st := string(CMD_ONION_CLIENT_AUTH_ADD) + " " + auth.HSAddr + " " + string(auth.KType) + ":" + base64.StdEncoding.EncodeToString(auth.KeyBlob)
+	st := "ONION_CLIENT_AUTH_ADD " + auth.HSAddr + " " + string(auth.KType) + ":" + base64.StdEncoding.EncodeToString(auth.KeyBlob)
 	if len(auth.ClientName) > 0 {
 		st += " ClientName=" + auth.ClientName
 	}
@@ -711,7 +671,7 @@ func (c *LowController) OnionClientAuthAdd(auth OnionClientAuth) error {
 }
 
 func (c *LowController) OnionClientAuthRemove(HSAddr string) error {
-	rep, err := c.sendPacket([]byte(string(CMD_ONION_CLIENT_AUTH_REMOVE) + " " + HSAddr + "\r\n"))
+	rep, err := c.sendPacket([]byte("ONION_CLIENT_AUTH_REMOVE " + HSAddr + "\r\n"))
 	if err != nil {
 		return err
 	}
@@ -719,7 +679,7 @@ func (c *LowController) OnionClientAuthRemove(HSAddr string) error {
 }
 
 func (c *LowController) OnionClientAuthView(HSAddr string) ([]OnionClientAuth, error) {
-	st := string(CMD_ONION_CLIENT_AUTH_VIEW)
+	st := "ONION_CLIENT_AUTH_VIEW"
 	if len(HSAddr) > 0 {
 		st += " " + HSAddr
 	}
@@ -761,7 +721,7 @@ func (c *LowController) OnionClientAuthView(HSAddr string) ([]OnionClientAuth, e
 }
 
 func (c *LowController) DropOwnership() error {
-	rep, err := c.sendPacket([]byte(string(CMD_DROPOWNERSHIP) + "\r\n"))
+	rep, err := c.sendPacket([]byte("DROPOWNERSHIP\r\n"))
 	if err != nil {
 		return err
 	}
@@ -769,7 +729,7 @@ func (c *LowController) DropOwnership() error {
 }
 
 func (c *LowController) DropTimeouts() error {
-	rep, err := c.sendPacket([]byte(string(CMD_DROPTIMEOUTS) + "\r\n"))
+	rep, err := c.sendPacket([]byte("DROPTIMEOUTS\r\n"))
 	if err != nil {
 		return err
 	}
