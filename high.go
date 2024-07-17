@@ -453,10 +453,12 @@ func (c *Controller) NewListener(virtPort uint16, keyBlob string, auths []HSAuth
 }
 
 func (c *Controller) NewForwarder(ports []HSPortConfig, keyBlob string, auths []HSAuthConfig) (*HiddenService, error) {
+	keyType := KEYTYPE_ED25519_V3
 	if len(keyBlob) == 0 {
 		keyBlob = GENERATE_BEST
+		keyType = KEYTYPE_NEW
 	}
-	config, err := c.LowController.AddOnion(KEYTYPE_NEW, keyBlob, nil, 0, ports, auths)
+	config, err := c.LowController.AddOnion(keyType, keyBlob, nil, 0, ports, auths)
 	return &HiddenService{
 		ctrl:   c,
 		Config: config,
