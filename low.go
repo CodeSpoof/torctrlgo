@@ -145,11 +145,8 @@ func (c *LowController) GetConf(names []string) (configs map[string][]string, de
 	return
 }
 
-func (c *LowController) SetEvents(codes []string, extended bool) error {
+func (c *LowController) SetEvents(codes []string) error {
 	st := "SETEVENTS "
-	if extended {
-		st += "EXTENDED "
-	}
 	rep, err := c.sendPacket([]byte(st + strings.Join(codes, " ") + "\r\n"))
 	if err != nil {
 		return err
@@ -310,17 +307,6 @@ func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
 		return wrapError("purpose must be \"general\" or \"controller\"", ErrSyntaxCommandArgument)
 	}
 	rep, err := c.sendPacket([]byte("SETCIRCUITPURPOSE " + strconv.Itoa(circuitID) + " purpose=" + purpose + "\r\n"))
-	if err != nil {
-		return err
-	}
-	return processErrorLine(rep[0])
-}
-
-func (c *LowController) SetRouterPurpose(nicknameOrKey, purpose string) error {
-	if purpose != "general" && purpose != "controller" && purpose != "bridge" {
-		return wrapError("\""+purpose+"\" is not a valid router purpose", ErrUnrecognizedEntity)
-	}
-	rep, err := c.sendPacket([]byte("SETROUTERPURPOSE " + nicknameOrKey + " " + purpose + "\r\n"))
 	if err != nil {
 		return err
 	}
