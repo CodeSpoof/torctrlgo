@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"slices"
 	"strconv"
 	"strings"
@@ -37,38 +36,38 @@ var (
 func processErrorLine(line ReplyLine) error {
 	switch line.StatusCode {
 	case 251:
-		return fmt.Errorf(string(line.Line)+": %w", ErrOperationUnnecessary)
+		return wrapError(string(line.Line), ErrOperationUnnecessary)
 	case 451:
-		return fmt.Errorf(string(line.Line)+": %w", ErrResourceExhausted)
+		return wrapError(string(line.Line), ErrResourceExhausted)
 	case 500:
-		return fmt.Errorf(string(line.Line)+": %w", ErrProtocolSyntaxError)
+		return wrapError(string(line.Line), ErrProtocolSyntaxError)
 	case 510:
-		return fmt.Errorf(string(line.Line)+": %w", ErrUnrecognizedCommand)
+		return wrapError(string(line.Line), ErrUnrecognizedCommand)
 	case 511:
-		return fmt.Errorf(string(line.Line)+": %w", ErrUnimplementedCommand)
+		return wrapError(string(line.Line), ErrUnimplementedCommand)
 	case 512:
-		return fmt.Errorf(string(line.Line)+": %w", ErrSyntaxCommandArgument)
+		return wrapError(string(line.Line), ErrSyntaxCommandArgument)
 	case 513:
-		return fmt.Errorf(string(line.Line)+": %w", ErrUnrecognizedCommandArgument)
+		return wrapError(string(line.Line), ErrUnrecognizedCommandArgument)
 	case 514:
-		return fmt.Errorf(string(line.Line)+": %w", ErrAuthenticationRequired)
+		return wrapError(string(line.Line), ErrAuthenticationRequired)
 	case 515:
-		return fmt.Errorf(string(line.Line)+": %w", ErrBadAuthentication)
+		return wrapError(string(line.Line), ErrBadAuthentication)
 	case 550:
-		return fmt.Errorf(string(line.Line)+": %w", ErrUnspecified)
+		return wrapError(string(line.Line), ErrUnspecified)
 	case 551:
-		return fmt.Errorf(string(line.Line)+": %w", ErrInternal)
+		return wrapError(string(line.Line), ErrInternal)
 	case 552:
-		return fmt.Errorf(string(line.Line)+": %w", ErrUnrecognizedEntity)
+		return wrapError(string(line.Line), ErrUnrecognizedEntity)
 	case 553:
-		return fmt.Errorf(string(line.Line)+": %w", ErrInvalidConfigurationValue)
+		return wrapError(string(line.Line), ErrInvalidConfigurationValue)
 	case 554:
-		return fmt.Errorf(string(line.Line)+": %w", ErrInvalidDescriptor)
+		return wrapError(string(line.Line), ErrInvalidDescriptor)
 	case 555:
-		return fmt.Errorf(string(line.Line)+": %w", ErrUnmanagedEntity)
+		return wrapError(string(line.Line), ErrUnmanagedEntity)
 	default:
 		if line.StatusCode != 250 && line.StatusCode != 252 {
-			return fmt.Errorf(string(line.Line)+": %w", ErrUnknown)
+			return wrapError(string(line.Line), ErrUnknown)
 		}
 	}
 	return nil
@@ -83,7 +82,7 @@ type ProtocolInfo struct {
 
 func (c *LowController) iSetConf(cmd string, configs map[string]string) error {
 	if len(configs) == 0 {
-		return fmt.Errorf("configs can't be empty: %w", ErrSyntaxCommandArgument)
+		return wrapError("configs can't be empty", ErrSyntaxCommandArgument)
 	}
 	l := make([]string, len(configs))
 	for k, v := range configs {
@@ -223,7 +222,7 @@ func (c *LowController) SendSignal(signal Signal) error {
 
 func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, error) {
 	if len(addrs) == 0 {
-		return nil, fmt.Errorf("addresses can't be empty: %w", ErrSyntaxCommandArgument)
+		return nil, wrapError("addresses can't be empty", ErrSyntaxCommandArgument)
 	}
 	st := "MAPADDRESS"
 	for k, v := range addrs {
@@ -278,14 +277,14 @@ func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
 func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose string) (int, error) {
 	st := "EXTENDCIRCUIT " + strconv.Itoa(circuitID)
 	if circuitID != 0 && len(path) == 0 {
-		return 0, fmt.Errorf("path can't be empty for extending existing circuits: %w", ErrSyntaxCommandArgument)
+		return 0, wrapError("path can't be empty for extending existing circuits", ErrSyntaxCommandArgument)
 	}
 	if len(path) > 0 {
 		st += " " + strings.Join(path, ",")
 	}
 	if len(purpose) > 0 {
 		if purpose != "general" && purpose != "controller" {
-			return 0, fmt.Errorf("purpose must be \"general\" or \"controller\": %w", ErrSyntaxCommandArgument)
+			return 0, wrapError("purpose must be \"general\" or \"controller\"", ErrSyntaxCommandArgument)
 		}
 		st += " purpose=" + purpose
 	}
@@ -310,7 +309,7 @@ func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
 
 func (c *LowController) SetRouterPurpose(nicknameOrKey, purpose string) error {
 	if purpose != "general" && purpose != "controller" && purpose != "bridge" {
-		return fmt.Errorf("\""+purpose+"\" is not a valid router purpose: %w", ErrUnrecognizedEntity)
+		return wrapError("\""+purpose+"\" is not a valid router purpose", ErrUnrecognizedEntity)
 	}
 	rep, err := c.sendPacket([]byte("SETROUTERPURPOSE " + nicknameOrKey + " " + purpose + "\r\n"))
 	if err != nil {
@@ -335,13 +334,13 @@ func (c *LowController) PostDescriptor(purpose string, cache string, descriptor 
 	st := "+POSTDESCRIPTOR"
 	if len(purpose) > 0 {
 		if purpose != "general" && purpose != "controller" && purpose != "bridge" {
-			return fmt.Errorf("\""+purpose+"\" is not a valid router purpose: %w", ErrUnrecognizedEntity)
+			return wrapError("\""+purpose+"\" is not a valid router purpose", ErrUnrecognizedEntity)
 		}
 		st += " purpose=" + purpose
 	}
 	if len(cache) > 0 {
 		if cache != "yes" && cache != "no" {
-			return fmt.Errorf("\""+cache+"\" is not a valid option for cache: %w", ErrUnrecognizedEntity)
+			return wrapError("\""+cache+"\" is not a valid option for cache", ErrUnrecognizedEntity)
 		}
 		st += " cache=" + cache
 	}
@@ -417,7 +416,7 @@ func (c *LowController) Quit() error {
 
 func (c *LowController) UseFeature(features []string) error {
 	if len(features) == 0 {
-		return fmt.Errorf("features can't be empty: %w", ErrSyntaxCommandArgument)
+		return wrapError("features can't be empty", ErrSyntaxCommandArgument)
 	}
 	rep, err := c.sendPacket([]byte("USEFEATURE " + strings.Join(features, " ") + "\r\n"))
 	if err != nil {
@@ -602,7 +601,7 @@ func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string
 		st += " MaxStreams=" + strconv.Itoa(int(maxStreams))
 	}
 	if len(ports) == 0 {
-		return nil, fmt.Errorf("missing port configuration: %w", ErrSyntaxCommandArgument)
+		return nil, wrapError("missing port configuration", ErrSyntaxCommandArgument)
 	}
 	for _, portConfig := range ports {
 		st += " Port=" + strconv.Itoa(int(portConfig.VirtPort))
