@@ -517,6 +517,9 @@ func (c *LowController) TakeOwnership() error {
 }
 
 func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (serverHash []byte, serverNonce []byte, err error) {
+	if len(clientNonce) < 1 {
+		return nil, nil, wrapError("client nonce too short", ErrSyntaxCommandArgument)
+	}
 	rep, err := c.sendPacket([]byte("AUTHCHALLENGE " + chllngType + " " + hex.EncodeToString(clientNonce) + "\r\n"))
 	if err != nil {
 		return
@@ -526,25 +529,21 @@ func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (se
 		return
 	}
 	segs := strings.Split(string(rep[0].Line), " ")
-	if segs[0] != "AUTHCHALLENGE" {
-		err = errors.New("not an auth-challenge response")
-		return
-	}
 	dict := parseStringDict(string(rep[0].Line)[len(segs[0])+1:])
 	if _, ok := dict["SERVERHASH"]; !ok {
-		err = errors.New("server-hash missing")
+		err = wrapError("server-hash missing", ErrInternal)
 		return
 	}
 	serverHash, err = hex.DecodeString(dict["SERVERHASH"])
 	if err != nil {
-		return nil, nil, errors.New("server-hash malformed")
+		return nil, nil, wrapError("server-hash malformed", ErrInternal)
 	}
 	if _, ok := dict["SERVERNONCE"]; !ok {
-		return nil, nil, errors.New("server-nonce missing")
+		return nil, nil, wrapError("server-nonce missing", ErrInternal)
 	}
 	serverNonce, err = hex.DecodeString(dict["SERVERNONCE"])
 	if err != nil {
-		return nil, nil, errors.New("server-nonce malformed")
+		return nil, nil, wrapError("server-nonce malformed", ErrInternal)
 	}
 	return
 }
