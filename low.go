@@ -110,26 +110,36 @@ func (c *LowController) ResetConf(confs map[string]string) error {
 	return c.iSetConf("RESETCONF", confs)
 }
 
-func (c *LowController) GetConf(names []string) (map[string]string, error) {
+func (c *LowController) GetConf(names []string) (configs map[string][]string, defaults map[string]int, err error) {
 	rep, err := c.sendPacket([]byte("GETCONF " + strings.Join(names, " ") + "\r\n"))
 	if err != nil {
-		return nil, err
+		return
 	}
-	if rep[0].StatusCode != 250 {
-		return nil, processErrorLine(rep[0])
+	err = processErrorLine(rep[0])
+	if err != nil {
+		return
 	}
-	ret := make(map[string]string)
+	configs = make(map[string][]string)
+	defaults = make(map[string]int)
 	for _, line := range rep {
 		match := patternConfigValue.FindStringSubmatch(string(line.Line))
-		if match == nil {
-			return nil, errors.New("invalid config value")
+		if match == nil && slices.Contains(names, string(line.Line)) {
+			if _, ok := defaults[string(line.Line)]; ok {
+				defaults[string(line.Line)]++
+			} else {
+				defaults[string(line.Line)] = 1
+			}
 		}
 		if match[2][0] == '"' {
 			match[2], _ = readQString(match[2])
 		}
-		ret[match[1]] = strings.Trim(match[2], "\r\n ")
+		if val, ok := configs[match[1]]; ok {
+			configs[match[1]] = append(val, strings.Trim(match[2], "\r\n "))
+		} else {
+			configs[match[1]] = []string{strings.Trim(match[2], "\r\n ")}
+		}
 	}
-	return ret, nil
+	return
 }
 
 func (c *LowController) SetEvents(codes []string) error {
