@@ -19,22 +19,70 @@ import (
 //
 // Certain functions may declare high concurrency-safety.
 type Controller struct {
-	genericPropLock   sync.Mutex
-	TorVersion        string
-	TorRCPath         string
-	VersionStatus     string
-	LowController     *LowController
-	notifLock         sync.Mutex
-	notifHandler      map[string]func([]ReplyLine)
-	iNotifLock        sync.Mutex
-	iNotifHandler     map[string]map[int]func([]ReplyLine) //TODO make registering multiple internal listeners possible
-	iNotifCount       map[string]int
-	availableLock     sync.Mutex
-	availableConfigs  map[string][2]string
-	availableInfos    map[string]string
-	availableEvents   []string
-	availableFeatures []string
-	availableSignals  []string
+	networkLiveness          string
+	networkLivenessHandlerID int
+	genericPropLock          sync.Mutex
+	torVersion               string
+	torRCPath                string
+	VersionStatus            string
+	LowController            *LowController
+	notifLock                sync.Mutex
+	notifHandler             map[string]func([]ReplyLine)
+	iNotifLock               sync.Mutex
+	iNotifHandler            map[string]map[int]func([]ReplyLine)
+	iNotifCount              map[string]int
+	availableLock            sync.Mutex
+	availableConfigs         map[string][2]string
+	availableInfos           map[string]string
+	availableEvents          []string
+	availableFeatures        []string
+	availableSignals         []string
+}
+
+func (c *Controller) TorVersion() string {
+	c.genericPropLock.Lock()
+	defer c.genericPropLock.Unlock()
+	return c.torVersion
+}
+
+func (c *Controller) TorRCPath() string {
+	c.genericPropLock.Lock()
+	defer c.genericPropLock.Unlock()
+	return c.torRCPath
+}
+
+func (c *Controller) AvailableConfigs() map[string][2]string {
+	c.availableLock.Lock()
+	defer c.availableLock.Unlock()
+	return c.availableConfigs
+}
+
+func (c *Controller) AvailableInfos() map[string]string {
+	c.availableLock.Lock()
+	defer c.availableLock.Unlock()
+	return c.availableInfos
+}
+
+func (c *Controller) AvailableEvents() []string {
+	c.availableLock.Lock()
+	defer c.availableLock.Unlock()
+	return c.availableEvents
+}
+
+func (c *Controller) AvailableFeatures() []string {
+	c.availableLock.Lock()
+	defer c.availableLock.Unlock()
+	return c.availableFeatures
+}
+
+func (c *Controller) AvailableSignals() []string {
+	c.availableLock.Lock()
+	defer c.availableLock.Unlock()
+	return c.availableSignals
+}
+
+func (c *Controller) Online() bool {
+	return c.networkLiveness == "UP"
 }
 
 func NewController() *Controller {
@@ -61,13 +109,13 @@ func (c *Controller) Open(addr string) error {
 }
 
 func (c *Controller) loadCompatData() error {
-	info, err := c.LowController.GetInfo([]string{"version", "config-file", "status/version/current", "config/names", "info/names", "events/names", "features/names", "signal/names"})
+	info, err := c.LowController.GetInfo([]string{"version", "config-file", "status/version/current", "config/names", "info/names", "events/names", "features/names", "signal/names", "network-liveness"})
 	if err != nil {
 		return err
 	}
 	c.genericPropLock.Lock()
-	c.TorVersion = info["version"]
-	c.TorRCPath = info["config-file"]
+	c.torVersion = info["version"]
+	c.torRCPath = info["config-file"]
 	c.VersionStatus = info["status/version/current"]
 	c.genericPropLock.Unlock()
 	var segs []string
@@ -83,6 +131,7 @@ func (c *Controller) loadCompatData() error {
 	c.availableEvents = strings.Split(info["events/names"], " ")
 	c.availableFeatures = strings.Split(info["features/names"], " ")
 	c.availableSignals = strings.Split(info["signal/names"], " ")
+	c.networkLiveness = strings.ToUpper(info["network-liveness"])
 	c.availableLock.Unlock()
 	return nil
 }
@@ -125,6 +174,10 @@ type AuthData struct {
 // This function is fully thread-safe, although there shouldn't be any scenario, where that's applicable
 func (c *Controller) Authenticate(method AuthMethod, data AuthData) error {
 	err := c.iAuthenticate(method, data)
+	if err != nil {
+		return err
+	}
+	c.networkLivenessHandlerID, err = c.iRegisterEvent(EVENT_NETWORK_LIVENESS, c.notifNetworkLiveness)
 	if err != nil {
 		return err
 	}
@@ -378,4 +431,8 @@ func (c *Controller) NewIdentity() error {
 	}
 	c.availableLock.Unlock()
 	return c.LowController.SendSignal(SIGNAL_NEWNYM)
+}
+
+func (c *Controller) notifNetworkLiveness(reply []ReplyLine) {
+	c.networkLiveness = strings.Split(string(reply[0].Line), " ")[1]
 }
