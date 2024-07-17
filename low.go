@@ -142,8 +142,12 @@ func (c *LowController) GetConf(names []string) (configs map[string][]string, de
 	return
 }
 
-func (c *LowController) SetEvents(codes []string) error {
-	rep, err := c.sendPacket([]byte("SETEVENTS " + strings.Join(codes, " ") + "\r\n"))
+func (c *LowController) SetEvents(codes []string, extended bool) error {
+	st := "SETEVENTS "
+	if extended {
+		st += "EXTENDED "
+	}
+	rep, err := c.sendPacket([]byte(st + strings.Join(codes, " ") + "\r\n"))
 	if err != nil {
 		return err
 	}
