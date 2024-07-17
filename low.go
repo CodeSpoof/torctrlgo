@@ -243,6 +243,8 @@ func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, 
 		}
 		if match := patternConfigValue.FindStringSubmatch(string(line.Line)); match != nil {
 			ret[match[1]] = strings.Trim(match[2], "\r\n ")
+		} else {
+			return nil, wrapError("invalid reply line", ErrUnknown)
 		}
 	}
 	return ret, nil
