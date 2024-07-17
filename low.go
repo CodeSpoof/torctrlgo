@@ -407,7 +407,7 @@ func (c *LowController) CloseStream(streamID string, reason RelayEndReason, flag
 }
 
 const (
-	FLAG_CIRCUITCLOSE_IFUNUSED = "IfUnused"
+	FLAG_CLOSECIRCUIT_IFUNUSED = "IfUnused"
 )
 
 func (c *LowController) CloseCircuit(circuitID int, flags []string) error {
