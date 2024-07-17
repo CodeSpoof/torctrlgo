@@ -422,11 +422,8 @@ func (c *LowController) CloseCircuit(circuitID int, flags []string) error {
 }
 
 func (c *LowController) Quit() error {
-	rep, err := c.sendPacket([]byte("QUIT\r\n"))
-	if err != nil {
-		return err
-	}
-	return processErrorLine(rep[0])
+	err := c.sendPacketDiscardReply([]byte("QUIT\r\n"))
+	return err
 }
 
 func (c *LowController) UseFeature(features []string) error {
