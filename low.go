@@ -78,6 +78,7 @@ type ProtocolInfo struct {
 	TorVersion  string
 	AuthMethods []string
 	CookieFiles []string
+	OtherLines  []string
 }
 
 func (c *LowController) iSetConf(cmd string, configs map[string]string) error {
@@ -451,11 +452,12 @@ func (c *LowController) Resolve(addrs []string, reverse bool) error {
 }
 
 func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error) {
-	ret := ProtocolInfo{
-		AuthMethods: make([]string, 0),
-		CookieFiles: make([]string, 0),
+	ret := ProtocolInfo{}
+	st := "PROTOCOLINFO"
+	if len(versions) > 0 {
+		st += " " + strings.Join(versions, " ")
 	}
-	rep, err := c.sendPacket([]byte("PROTOCOLINFO " + strings.Join(versions, " ") + "\r\n"))
+	rep, err := c.sendPacket([]byte(st + "\r\n"))
 	if err != nil {
 		return nil, err
 	}
@@ -471,7 +473,7 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 		case "PROTOCOLINFO":
 			ret.PIVERSION = segs[1]
 		case "AUTH":
-			for i := 0; i < len(line); i++ {
+			for i := 4; i < len(line); i++ {
 				if line[i] != ' ' {
 					continue
 				}
@@ -488,6 +490,8 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 			if strings.HasPrefix(segs[1], "Tor=") {
 				ret.TorVersion, _ = readQCString(line[len(segs[0])+5:])
 			}
+		default:
+			ret.OtherLines = append(ret.OtherLines, line)
 		}
 	}
 	c.lastProtoLock.Lock()
