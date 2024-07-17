@@ -603,6 +603,15 @@ const (
 	GENERATE_ED25519_V3 = "ED25519-V3"
 )
 
+const (
+	FLAG_ADD_ONION_DISCARD_PK                = "DiscardPK"
+	FLAG_ADD_ONION_DETACH                    = "Detach"
+	FLAG_ADD_ONION_BASIC_AUTH                = "BasicAuth"
+	FLAG_ADD_ONION_V3_AUTH                   = "V3Auth"
+	FLAG_ADD_ONION_NON_ANONYMOUS             = "NonAnonymous"
+	FLAG_ADD_ONION_MAX_STREAMS_CLOSE_CIRCUIT = "MaxStreamsCloseCircuit"
+)
+
 type HSPortConfig struct {
 	VirtPort uint16
 	Target   string
@@ -623,7 +632,7 @@ type HSConfigReply struct {
 func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string, maxStreams uint16, ports []HSPortConfig, auths []HSAuthConfig) (*HSConfigReply, error) {
 	st := "ADD_ONION " + string(keyType) + ":" + keyBlob
 	if len(flags) > 0 {
-		st += " Flags=" + strings.Join(flags, " ")
+		st += " Flags=" + strings.Join(flags, ",")
 	}
 	if maxStreams > 0 {
 		st += " MaxStreams=" + strconv.Itoa(int(maxStreams))
@@ -655,11 +664,13 @@ func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string
 		return nil, err
 	}
 	ret := HSConfigReply{}
+	ok := false
 	for _, line := range rep {
 		if match := patternConfigValue.FindStringSubmatch(string(line.Line)); match != nil {
 			i := strings.IndexByte(match[1], ':')
 			switch match[1] {
 			case "ServiceID":
+				ok = true
 				ret.ServiceID = strings.Trim(match[2], "\r\n ")
 			case "PrivateKey":
 				ret.keyType = KeyType(match[1][:i])
@@ -671,6 +682,9 @@ func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string
 				})
 			}
 		}
+	}
+	if !ok {
+		return nil, wrapError("service id expected", ErrInternal)
 	}
 	return &ret, nil
 }
