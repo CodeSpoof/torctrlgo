@@ -405,6 +405,10 @@ func (c *LowController) CloseStream(streamID string, reason RelayEndReason, flag
 	return processErrorLine(rep[0])
 }
 
+const (
+	FLAG_CIRCUITCLOSE_IFUNUSED = "IfUnused"
+)
+
 func (c *LowController) CloseCircuit(circuitID int, flags []string) error {
 	st := "CLOSECIRCUIT " + strconv.Itoa(circuitID)
 	if len(flags) > 0 {
