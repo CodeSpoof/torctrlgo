@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"io"
+	"net"
 	"os"
 	"slices"
 	"strings"
@@ -435,4 +436,29 @@ func (c *Controller) NewIdentity() error {
 
 func (c *Controller) notifNetworkLiveness(reply []ReplyLine) {
 	c.networkLiveness = strings.Split(string(reply[0].Line), " ")[1]
+}
+
+type HiddenService struct {
+	ctrl   *Controller
+	Config *HSConfigReply
+}
+
+func (c *Controller) NewListener(virtPort uint16, keyBlob string, auths []HSAuthConfig) (net.Listener, *HiddenService, error) {
+	listener, err := net.Listen("tcp", "127.0.0.1:")
+	if err != nil {
+		return nil, nil, err
+	}
+	hs, err := c.NewForwarder([]HSPortConfig{{VirtPort: virtPort, Target: listener.Addr().String()}}, keyBlob, auths)
+	return listener, hs, err
+}
+
+func (c *Controller) NewForwarder(ports []HSPortConfig, keyBlob string, auths []HSAuthConfig) (*HiddenService, error) {
+	if len(keyBlob) == 0 {
+		keyBlob = GENERATE_ED25519_V3
+	}
+	config, err := c.LowController.AddOnion(KEYTYPE_NEW, keyBlob, nil, 0, ports, auths)
+	return &HiddenService{
+		ctrl:   c,
+		Config: config,
+	}, err
 }
