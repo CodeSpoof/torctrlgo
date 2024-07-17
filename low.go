@@ -91,7 +91,7 @@ const (
 	CMD_SETCIRCUITPURPOSE        Cmd = "SETCIRCUITPURPOSE"
 	CMD_SETROUTERPURPOSE         Cmd = "SETROUTERPURPOSE"
 	CMD_ATTACHSTREAM             Cmd = "ATTACHSTREAM"
-	CMD_POSTDESCRIPTOR           Cmd = "POSTDESCRIPTOR"
+	CMD_POSTDESCRIPTOR           Cmd = "+POSTDESCRIPTOR"
 	CMD_REDIRECTSTREAM           Cmd = "REDIRECTSTREAM"
 	CMD_CLOSESTREAM              Cmd = "CLOSESTREAM"
 	CMD_CLOSECIRCUIT             Cmd = "CLOSECIRCUIT"
@@ -99,7 +99,7 @@ const (
 	CMD_USEFEATURE               Cmd = "USEFEATURE"
 	CMD_RESOLVE                  Cmd = "RESOLVE"
 	CMD_PROTOCOLINFO             Cmd = "PROTOCOLINFO"
-	CMD_LOADCONF                 Cmd = "LOADCONF"
+	CMD_LOADCONF                 Cmd = "+LOADCONF"
 	CMD_TAKEOWNERSHIP            Cmd = "TAKEOWNERSHIP"
 	CMD_AUTHCHALLENGE            Cmd = "AUTHCHALLENGE"
 	CMD_DROPGUARDS               Cmd = "DROPGUARDS"
@@ -242,6 +242,31 @@ func (c *LowController) SendSignal(signal Signal) error {
 	return processErrorLine(rep[0])
 }
 
+func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, error) {
+	if len(addrs) == 0 {
+		return nil, ErrSyntaxCommandArgument(errors.New("addresses can't be empty"))
+	}
+	st := string(CMD_MAPADDRESS)
+	for k, v := range addrs {
+		st += " " + k + "=" + v
+	}
+	rep, err := c.sendPacket([]byte(st + "\r\n"))
+	if err != nil {
+		return nil, err
+	}
+	err = processErrorLine(rep[0])
+	if err != nil {
+		return nil, err
+	}
+	ret := make(map[string]string)
+	for _, line := range rep {
+		if match := patternConfigValue.FindStringSubmatch(string(line.Line)); match != nil {
+			ret[match[1]] = strings.Trim(match[2], "\r\n ")
+		}
+	}
+	return ret, nil
+}
+
 func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
 	rep, err := c.sendPacket([]byte(strings.Join(append([]string{string(CMD_GETINFO)}, keywords...), " ") + "\r\n"))
 	if err != nil {
@@ -266,6 +291,142 @@ func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
 		return nil, errors.New("keywords left unanswered")
 	}
 	return ret, nil
+}
+
+func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose string) (int, error) {
+	st := string(CMD_EXTENDCIRCUIT) + " " + strconv.Itoa(circuitID)
+	if circuitID != 0 && len(path) == 0 {
+		return 0, ErrSyntaxCommandArgument(errors.New("path can't be empty for extending existing circuits"))
+	}
+	if len(path) > 0 {
+		st += " " + strings.Join(path, ",")
+	}
+	if len(purpose) > 0 {
+		if purpose != "general" && purpose != "controller" {
+			return 0, ErrSyntaxCommandArgument(errors.New("purpose must be \"general\" or \"controller\""))
+		}
+		st += " purpose=" + purpose
+	}
+	rep, err := c.sendPacket([]byte(st + "\r\n"))
+	if err != nil {
+		return 0, err
+	}
+	err = processErrorLine(rep[0])
+	if err != nil {
+		return 0, err
+	}
+	segs := strings.Split(string(rep[0].Line), " ")
+	if segs[0] != "EXTENDED" {
+		return 0, ErrUnknown(errors.New("invalid reply"))
+	}
+	return strconv.Atoi(segs[1])
+}
+
+func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
+	rep, err := c.sendPacket([]byte(string(CMD_SETCIRCUITPURPOSE) + " " + strconv.Itoa(circuitID) + " purpose=" + purpose + "\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
+func (c *LowController) SetRouterPurpose(nicknameOrKey, purpose string) error {
+	if purpose != "general" && purpose != "controller" && purpose != "bridge" {
+		return ErrUnrecognizedEntity(errors.New("\"" + purpose + "\" is not a valid router purpose"))
+	}
+	rep, err := c.sendPacket([]byte(string(CMD_SETROUTERPURPOSE) + " " + nicknameOrKey + " " + purpose + "\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
+func (c *LowController) AttachStream(streamID string, circuitID, hopNum int) error {
+	st := string(CMD_ATTACHSTREAM) + " " + streamID + strconv.Itoa(circuitID)
+	if hopNum > 0 {
+		st += " HOP=" + strconv.Itoa(hopNum)
+	}
+	rep, err := c.sendPacket([]byte(st + "\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
+func (c *LowController) PostDescriptor(purpose string, cache string, descriptor string) error {
+	st := string(CMD_POSTDESCRIPTOR)
+	if len(purpose) > 0 {
+		if purpose != "general" && purpose != "controller" && purpose != "bridge" {
+			return ErrUnrecognizedEntity(errors.New("\"" + purpose + "\" is not a valid router purpose"))
+		}
+		st += " purpose=" + purpose
+	}
+	if len(cache) > 0 {
+		if cache != "yes" && cache != "no" {
+			return ErrUnrecognizedEntity(errors.New("\"" + cache + "\" is not a valid option for cache"))
+		}
+		st += " cache=" + cache
+	}
+	rep, err := c.sendPacket([]byte(st + "\r\n" + descriptor + "\r\n.\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
+func (c *LowController) RedirectStream(streamID string, address string, port uint16) error {
+	st := string(CMD_REDIRECTSTREAM) + " " + streamID + " " + address
+	if port > 0 {
+		st += " " + strconv.Itoa(int(port))
+	}
+	rep, err := c.sendPacket([]byte(st + "\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
+type RelayEndReason byte
+
+const (
+	RELAY_END_REASON_MISC           RelayEndReason = 1
+	RELAY_END_REASON_RESOLVEFAILED  RelayEndReason = 2
+	RELAY_END_REASON_CONNECTREFUSED RelayEndReason = 3
+	RELAY_END_REASON_EXITPOLICY     RelayEndReason = 4
+	RELAY_END_REASON_DESTROY        RelayEndReason = 5
+	RELAY_END_REASON_DONE           RelayEndReason = 6
+	RELAY_END_REASON_TIMEOUT        RelayEndReason = 7
+	RELAY_END_REASON_NOROUTE        RelayEndReason = 8
+	RELAY_END_REASON_HIBERNATING    RelayEndReason = 9
+	RELAY_END_REASON_INTERNAL       RelayEndReason = 10
+	RELAY_END_REASON_RESOURCELIMIT  RelayEndReason = 11
+	RELAY_END_REASON_CONNRESET      RelayEndReason = 12
+	RELAY_END_REASON_TORPROTOCOL    RelayEndReason = 13
+	RELAY_END_REASON_NOTDIRECTORY   RelayEndReason = 14
+)
+
+func (c *LowController) CloseStream(streamID string, reason RelayEndReason, flags []string) error {
+	b := append([]byte(string(CMD_CLOSESTREAM)+streamID), byte(reason))
+	if len(flags) > 0 {
+		b = append(b, []byte(" "+strings.Join(flags, " "))...)
+	}
+	rep, err := c.sendPacket(append(b, '\r', '\n'))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
+func (c *LowController) CloseCircuit(circuitID int, flags []string) error {
+	st := string(CMD_CLOSECIRCUIT) + " " + strconv.Itoa(circuitID)
+	if len(flags) > 0 {
+		st += " " + strings.Join(flags, " ")
+	}
+	rep, err := c.sendPacket([]byte(st + "\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
 }
 
 func (c *LowController) Quit() error {
@@ -342,6 +503,14 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 	return &ret, nil
 }
 
+func (c *LowController) LoadConf(config string) error {
+	rep, err := c.sendPacket([]byte(string(CMD_LOADCONF) + "\r\n" + config + "\r\n.\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
+}
+
 func (c *LowController) TakeOwnership() error {
 	rep, err := c.sendPacket([]byte(string(CMD_TAKEOWNERSHIP) + "\r\n"))
 	if err != nil {
@@ -381,6 +550,14 @@ func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (se
 		return nil, nil, errors.New("server-nonce malformed")
 	}
 	return
+}
+
+func (c *LowController) DropGuards() error {
+	rep, err := c.sendPacket([]byte(string(CMD_DROPGUARDS) + "\r\n"))
+	if err != nil {
+		return err
+	}
+	return processErrorLine(rep[0])
 }
 
 func (c *LowController) HSFetch(addressOrDescriptor string, servers []string) error {
