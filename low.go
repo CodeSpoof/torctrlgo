@@ -291,11 +291,7 @@ func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose stri
 	if err != nil {
 		return 0, err
 	}
-	segs := strings.Split(string(rep[0].Line), " ")
-	if segs[0] != "EXTENDED" {
-		return 0, ErrUnknown(errors.New("invalid reply"))
-	}
-	return strconv.Atoi(segs[1])
+	return strconv.Atoi(string(rep[0].Line[bytes.IndexByte(rep[0].Line, ' ')+1:]))
 }
 
 func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
