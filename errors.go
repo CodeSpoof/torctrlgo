@@ -7,7 +7,7 @@ func wrapError(msg string, err error) error {
 	}
 }
 
-func wrappErrors(msg string, errs []error) error {
+func wrapErrors(msg string, errs []error) error {
 	return &wrapErrs{
 		msg:  msg,
 		errs: errs,
