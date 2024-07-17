@@ -438,12 +438,12 @@ func (c *LowController) UseFeature(features []string) error {
 	return processErrorLine(rep[0])
 }
 
-func (c *LowController) Resolve(addr string, reverse bool) error {
+func (c *LowController) Resolve(addrs []string, reverse bool) error {
 	s := "RESOLVE"
 	if reverse {
 		s += " mode=reverse"
 	}
-	rep, err := c.sendPacket([]byte(s + " " + addr + "\r\n"))
+	rep, err := c.sendPacket([]byte(s + " " + strings.Join(addrs, " ") + "\r\n"))
 	if err != nil {
 		return err
 	}
