@@ -610,9 +610,9 @@ type HSAuthConfig struct {
 
 type HSConfigReply struct {
 	ServiceID string
-	keyType   KeyType
-	keyBlob   string
-	auths     []HSAuthConfig
+	KeyType   KeyType
+	KeyBlob   string
+	Auths     []HSAuthConfig
 }
 
 func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string, maxStreams uint16, ports []HSPortConfig, auths []HSAuthConfig) (*HSConfigReply, error) {
@@ -653,18 +653,18 @@ func (c *LowController) AddOnion(keyType KeyType, keyBlob string, flags []string
 	ok := false
 	for _, line := range rep {
 		if match := patternConfigValue.FindStringSubmatch(string(line.Line)); match != nil {
-			i := strings.IndexByte(match[1], ':')
+			i := strings.IndexByte(match[2], ':')
 			switch match[1] {
 			case "ServiceID":
 				ok = true
 				ret.ServiceID = strings.Trim(match[2], "\r\n ")
 			case "PrivateKey":
-				ret.keyType = KeyType(match[1][:i])
-				ret.keyBlob = match[1][i+1:]
+				ret.KeyType = KeyType(match[2][:i])
+				ret.KeyBlob = match[2][i+1:]
 			case "ClientAuth":
-				ret.auths = append(ret.auths, HSAuthConfig{
-					ClientName: match[1][:i],
-					AuthBlob:   match[1][i+1:],
+				ret.Auths = append(ret.Auths, HSAuthConfig{
+					ClientName: match[2][:i],
+					AuthBlob:   match[2][i+1:],
 				})
 			}
 		}
