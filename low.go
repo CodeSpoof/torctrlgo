@@ -305,6 +305,9 @@ func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose stri
 }
 
 func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
+	if purpose != "general" && purpose != "controller" {
+		return wrapError("purpose must be \"general\" or \"controller\"", ErrSyntaxCommandArgument)
+	}
 	rep, err := c.sendPacket([]byte("SETCIRCUITPURPOSE " + strconv.Itoa(circuitID) + " purpose=" + purpose + "\r\n"))
 	if err != nil {
 		return err
