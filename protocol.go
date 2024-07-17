@@ -49,6 +49,14 @@ func (c *LowController) Open(addr string) (err error) {
 	return
 }
 
+func (c *LowController) sendPacketDiscardReply(data []byte) error {
+	c.replyLock.Lock()
+	c.replyChan <- nil
+	_, err := c.conn.Write(data)
+	c.replyLock.Unlock()
+	return err
+}
+
 func (c *LowController) sendPacket(data []byte) ([]ReplyLine, error) {
 	c.replyLock.Lock()
 	ch := make(chan []ReplyLine)
@@ -124,7 +132,9 @@ func (c *LowController) workerAssemblePackets() {
 		} else {
 			select {
 			case ch := <-c.replyChan:
-				*ch <- reply
+				if ch != nil {
+					*ch <- reply
+				}
 			default:
 				print("Unsolicited response, discarding...")
 			}
