@@ -251,6 +251,9 @@ func (c *LowController) MapAddress(addrs map[string]string) (map[string]string, 
 }
 
 func (c *LowController) GetInfo(keywords []string) (map[string]string, error) {
+	if len(keywords) == 0 {
+		return nil, wrapError("keywords can't be empty", ErrSyntaxCommandArgument)
+	}
 	rep, err := c.sendPacket([]byte(strings.Join(append([]string{"GETINFO"}, keywords...), " ") + "\r\n"))
 	if err != nil {
 		return nil, err
