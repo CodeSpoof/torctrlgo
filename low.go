@@ -329,6 +329,9 @@ func (c *LowController) SetRouterPurpose(nicknameOrKey, purpose string) error {
 func (c *LowController) AttachStream(streamID string, circuitID, hopNum int) error {
 	st := "ATTACHSTREAM " + streamID + strconv.Itoa(circuitID)
 	if hopNum > 0 {
+		if hopNum < 2 {
+			return wrapError("hop can't be 1", ErrSyntaxCommandArgument)
+		}
 		st += " HOP=" + strconv.Itoa(hopNum)
 	}
 	rep, err := c.sendPacket([]byte(st + "\r\n"))
