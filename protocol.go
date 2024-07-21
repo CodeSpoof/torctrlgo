@@ -22,6 +22,7 @@ type LowController struct {
 	lineChan         chan []byte
 	lastProtoLock    sync.Mutex
 	lastProtocolInfo *ProtocolInfo
+	Debug            bool
 }
 
 type ReplyLine struct {
@@ -36,6 +37,7 @@ func NewLowController() *LowController {
 		replyChan:        make(chan *chan []ReplyLine, 256),
 		lineChan:         make(chan []byte, 256),
 		lastProtocolInfo: nil,
+		Debug:            false,
 	}
 }
 
@@ -152,7 +154,9 @@ func (c *LowController) workerReceiveLines() {
 		if !bytes.Equal(lb[len(lb)-2:], []byte("\r\n")) {
 			log.Fatal("Line incorrectly terminated")
 		}
-		print(string(lb))
+		if c.Debug {
+			print(string(lb))
+		}
 		c.lineChan <- lb
 	}
 }
