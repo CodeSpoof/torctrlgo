@@ -91,7 +91,7 @@ func (c *LowController) iSetConf(cmd string, configs map[string]string) error {
 		if len(v) > 0 {
 			st += "="
 			if strings.Contains(v, "\"") {
-				st += writeQString(v)
+				st += WriteQString(v)
 			} else {
 				st += v
 			}
@@ -171,7 +171,7 @@ func (c *LowController) AuthenticateBytes(data []byte) error {
 }
 
 func (c *LowController) AuthenticateString(data string) error {
-	rep, err := c.sendPacket([]byte("AUTHENTICATE " + writeQString(data) + "\r\n"))
+	rep, err := c.sendPacket([]byte("AUTHENTICATE " + WriteQString(data) + "\r\n"))
 	if err != nil {
 		return err
 	}

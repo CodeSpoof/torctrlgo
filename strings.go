@@ -70,6 +70,6 @@ func ReadQCString(st string) (string, int) {
 	return patternQEscape.ReplaceAllString(rawStr, "$1"), len(rawStr) + 2
 }
 
-func writeQString(s string) string {
+func WriteQString(s string) string {
 	return "\"" + strings.ReplaceAll(s, "\"", "\\\"") + "\""
 }
