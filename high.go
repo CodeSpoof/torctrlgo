@@ -178,7 +178,7 @@ func (c *Controller) Authenticate(method AuthMethod, data AuthData) error {
 	if err != nil {
 		return err
 	}
-	c.networkLivenessHandlerID, err = c.iRegisterEvent(EVENT_NETWORK_LIVENESS, c.notifNetworkLiveness)
+	c.networkLivenessHandlerID, err = c.RegisterEvent(EVENT_NETWORK_LIVENESS, c.notifNetworkLiveness)
 	if err != nil {
 		return err
 	}
@@ -325,17 +325,10 @@ func (c *Controller) updateEvents() error {
 	return c.LowController.SetEvents(slices.Compact(keys))
 }
 
-// RegisterEvent sets the callback function for the given event.
+// RegisterEvent adds a callback function for the given event.
 //
 // This function is fully thread-safe.
-func (c *Controller) RegisterEvent(code EventCode, callback func([]ReplyLine)) error {
-	c.notifLock.Lock()
-	c.notifHandler[string(code)] = callback
-	c.notifLock.Unlock()
-	return c.updateEvents()
-}
-
-func (c *Controller) iRegisterEvent(code EventCode, callback func([]ReplyLine)) (int, error) {
+func (c *Controller) RegisterEvent(code EventCode, callback func([]ReplyLine)) (int, error) {
 	c.iNotifLock.Lock()
 	var id int
 	if val, ok := c.iNotifCount[string(code)]; ok {
@@ -351,17 +344,10 @@ func (c *Controller) iRegisterEvent(code EventCode, callback func([]ReplyLine)) 
 	return id, c.updateEvents()
 }
 
-// UnregisterEvent removes the set callback function for the given event.
+// UnregisterEvent removes a set callback function for the given event.
 //
 // This function is fully thread-safe.
-func (c *Controller) UnregisterEvent(code EventCode) error {
-	c.notifLock.Lock()
-	delete(c.notifHandler, string(code))
-	c.notifLock.Unlock()
-	return c.updateEvents()
-}
-
-func (c *Controller) iUnregisterEvent(code EventCode, id int) error {
+func (c *Controller) UnregisterEvent(code EventCode, id int) error {
 	c.iNotifLock.Lock()
 	delete(c.iNotifHandler[string(code)], id)
 	if len(c.iNotifHandler[string(code)]) == 0 {
@@ -378,7 +364,7 @@ func (c *Controller) iUnregisterEvent(code EventCode, id int) error {
 // This function is fully thread-safe
 func (c *Controller) HSDescAvailable(addr string) (bool, error) {
 	done := make(chan bool)
-	id, err := c.iRegisterEvent(EVENT_HS_DESC, func(lines []ReplyLine) {
+	id, err := c.RegisterEvent(EVENT_HS_DESC, func(lines []ReplyLine) {
 		segs := strings.Split(string(lines[0].Line), " ")
 		if segs[2] != addr {
 			return
@@ -397,7 +383,7 @@ func (c *Controller) HSDescAvailable(addr string) (bool, error) {
 		return false, err
 	}
 	ret := <-done
-	err = c.iUnregisterEvent(EVENT_HS_DESC, id)
+	err = c.UnregisterEvent(EVENT_HS_DESC, id)
 	if err != nil {
 		return false, err
 	}
