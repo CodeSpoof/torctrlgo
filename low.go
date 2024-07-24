@@ -134,7 +134,7 @@ func (c *LowController) GetConf(names []string) (configs map[string][]string, de
 			}
 		}
 		if match[2][0] == '"' {
-			match[2], _ = readQCString(match[2])
+			match[2], _ = ReadQCString(match[2])
 		}
 		if val, ok := configs[match[1]]; ok {
 			configs[match[1]] = append(val, strings.Trim(match[2], "\r\n "))
@@ -467,14 +467,14 @@ func (c *LowController) GetProtocolInfo(versions []string) (*ProtocolInfo, error
 					ret.AuthMethods = append(ret.AuthMethods, strings.Split(line[i+9:i+9+strings.Index(line[i+9:], " ")], ",")...)
 					i += strings.Index(line[i+1:], " ")
 				} else if strings.HasPrefix(line[i+1:], "COOKIEFILE=") {
-					str, j := readQCString(line[i+12:])
+					str, j := ReadQCString(line[i+12:])
 					ret.CookieFiles = append(ret.CookieFiles, str)
 					i += 11 + j
 				}
 			}
 		case "VERSION":
 			if strings.HasPrefix(segs[1], "Tor=") {
-				ret.TorVersion, _ = readQCString(line[len(segs[0])+5:])
+				ret.TorVersion, _ = ReadQCString(line[len(segs[0])+5:])
 			}
 		default:
 			ret.OtherLines = append(ret.OtherLines, line)
@@ -515,7 +515,7 @@ func (c *LowController) AuthChallenge(chllngType string, clientNonce []byte) (se
 		return
 	}
 	segs := strings.Split(string(rep[0].Line), " ")
-	dict := parseStringDict(string(rep[0].Line)[len(segs[0])+1:])
+	dict := ParseStringDict(string(rep[0].Line)[len(segs[0])+1:])
 	if _, ok := dict["SERVERHASH"]; !ok {
 		err = wrapError("server-hash missing", ErrInternal)
 		return
