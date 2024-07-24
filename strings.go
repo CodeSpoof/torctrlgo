@@ -15,7 +15,7 @@ var patternDict = regexp.MustCompile(`^([A-Za-z0-9_-]*)=`)
 
 var patternConfigValue = regexp.MustCompile(`([^=]+)=(?:\r\n)?([\s\S]+)`)
 
-func parseStringDict(s string) map[string]string {
+func ParseStringDict(s string) map[string]string {
 	s = strings.ReplaceAll(s, "\r\n", " ")
 	ret := map[string]string{}
 	var j int
@@ -27,7 +27,7 @@ func parseStringDict(s string) map[string]string {
 		i += len(match[0])
 		key := match[1]
 		if s[i] == '"' {
-			ret[key], j = readQCString(s[i:])
+			ret[key], j = ReadQCString(s[i:])
 			i += j
 		} else {
 			j = strings.Index(s[i:], " ")
@@ -38,7 +38,7 @@ func parseStringDict(s string) map[string]string {
 	return ret
 }
 
-func readQCString(st string) (string, int) {
+func ReadQCString(st string) (string, int) {
 	rawStr := patternString.FindStringSubmatch(st)[1]
 	if matches := patternCEscape.FindAllStringSubmatch(rawStr, -1); matches != nil {
 		// CString
