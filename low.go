@@ -299,7 +299,7 @@ func (c *LowController) ExtendCircuit(circuitID int, path []string, purpose stri
 	if err != nil {
 		return 0, err
 	}
-	return strconv.Atoi(string(rep[0].Line[bytes.IndexByte(rep[0].Line, ' ')+1:]))
+	return strconv.Atoi(strings.Trim(string(rep[0].Line[bytes.IndexByte(rep[0].Line, ' ')+1:]), "\r\n "))
 }
 
 func (c *LowController) SetCircuitPurpose(circuitID int, purpose string) error {
